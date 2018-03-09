@@ -26,7 +26,7 @@
 //! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
 //! use hal::{Delay, I2cdev};
-//! use mcp3425::{MCP3425, Resolution, Gain, Error};
+//! use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //!
 //! # fn main() {
 //! let dev = I2cdev::new("/dev/i2c-1").unwrap();
@@ -37,36 +37,19 @@
 //!
 //! ### Configuration
 //!
-//! You can use the methods starting with `with_` to configure the device in a
-//! chained fashion:
+//! You can choose the conversion resolution / sample rate and the PGA gain
+//! with a [`Config`](struct.Config.html) object.
+//!
+//! You can use the methods starting with `with_` to create a new instance of
+//! the configuration where the specified setting has been replaced.
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
-//! # use hal::{Delay, I2cdev};
-//! # use mcp3425::{MCP3425, Resolution, Gain};
+//! # use mcp3425::{Config, Resolution, Gain};
 //! # fn main() {
-//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
-//! # let address = 0x68;
-//! let mut adc = MCP3425::new(dev, address, Delay)
-//!     .with_resolution(Resolution::SPS240Bits12)
-//!     .with_gain(Gain::Gain1);
-//! # }
-//! ```
-//!
-//! Or you can use the methods starting with `set_` to mutate the instance in-place.
-//!
-//! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! # use hal::{Delay, I2cdev};
-//! # use mcp3425::{MCP3425, Resolution, Gain};
-//! # fn main() {
-//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
-//! # let address = 0x68;
-//! let mut adc = MCP3425::new(dev, address, Delay);
-//! adc.set_resolution(Resolution::SPS240Bits12);
-//! adc.set_gain(Gain::Gain1);
+//! let config = Config::new(Resolution::SPS240Bits12, Gain::Gain1);
+//! let high_res = config.with_resolution(Resolution::SPS15Bits16);
+//! let high_gain = high_res.with_gain(Gain::Gain8);
 //! # }
 //! ```
 //!
@@ -78,12 +61,13 @@
 //! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
 //! # use hal::{Delay, I2cdev};
-//! # use mcp3425::{MCP3425, Error};
+//! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
 //! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! # let mut adc = MCP3425::new(dev, address, Delay);
-//! match adc.oneshot() {
+//! let config = Config::new(Resolution::SPS240Bits12, Gain::Gain1);
+//! match adc.oneshot(&config) {
 //!     Ok(mv) => println!("ADC measured {} mV", mv),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
 //!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
@@ -241,14 +225,52 @@ impl Default for Gain {
 }
 
 
+/// Device configuration: Resolution and gain
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Config {
+    /// Conversion bit resolution and sample rate
+    pub resolution: Resolution,
+    /// Programmable gain amplifier (PGA)
+    pub gain: Gain,
+}
+
+impl Config {
+    /// Create a new device configuration with the specified resolution /
+    /// sample rate and gain.
+    ///
+    /// Note that creating and changing this instance does not have an
+    /// immediate effect on the device. It is only written when a measurement
+    /// is triggered (TODO: Or when writing config explicitly).
+    pub fn new(resolution: Resolution, gain: Gain) -> Self {
+        Config { resolution, gain }
+    }
+
+    /// Create a new configuration where the resolution has been replaced
+    /// with the specified value.
+    pub fn with_resolution(&self, resolution: Resolution) -> Self {
+        Config {
+            resolution,
+            gain: self.gain,
+        }
+    }
+
+    /// Create a new configuration where the gain has been replaced
+    /// with the specified value.
+    pub fn with_gain(&self, gain: Gain) -> Self {
+        Config {
+            resolution: self.resolution,
+            gain,
+        }
+    }
+}
+
+
 /// Driver for the MCP3425 ADC
 #[derive(Debug, Default)]
 pub struct MCP3425<I2C, D> {
     i2c: I2C,
     address: u8,
     delay: D,
-    resolution: Resolution,
-    gain: Gain,
 }
 
 impl<I2C, D, E> MCP3425<I2C, D>
@@ -262,35 +284,7 @@ where
             i2c,
             address,
             delay,
-            resolution: Default::default(),
-            gain: Default::default(),
         }
-    }
-
-    /// Set the sample rate (chained variant).
-    pub fn with_resolution(mut self, resolution: Resolution) -> Self {
-        self.resolution = resolution;
-        self
-    }
-
-    /// Set the sample rate (mutating variant).
-    pub fn set_resolution(&mut self, resolution: Resolution) {
-        self.resolution = resolution;
-    }
-
-    /// Set the gain (chained variant).
-    pub fn with_gain(mut self, gain: Gain) -> Self {
-        // TODO: In continuous mode, this will not update the actual config
-        // register. Should it?
-        self.gain = gain;
-        self
-    }
-
-    /// Set the gain (mutating variant).
-    pub fn set_gain(&mut self, gain: Gain) {
-        // TODO: In continuous mode, this will not update the actual config
-        // register. Should it?
-        self.gain = gain;
     }
 
     /// Do a one-shot voltage measurement.
@@ -298,11 +292,11 @@ where
     /// Return the result in millivolts.
     ///
     /// TODO: Newtype for return value.
-    pub fn oneshot(&mut self) -> Result<i16, Error<E>> {
+    pub fn oneshot(&mut self, config: &Config) -> Result<i16, Error<E>> {
         let command = START_CONVERSION
                     | ConversionMode::OneShot.val()
-                    | self.resolution.val()
-                    | self.gain.val();
+                    | config.resolution.val()
+                    | config.gain.val();
 
         // Send command
         self.i2c
@@ -316,12 +310,12 @@ where
         let val = self.read_i16()?;
 
         // Check against min/max codes
-        if val == self.resolution.max() {
+        if val == config.resolution.max() {
             Err(Error::VoltageTooHigh)
-        } else if val == self.resolution.min() {
+        } else if val == config.resolution.min() {
             Err(Error::VoltageTooLow)
         } else {
-            Ok(calculate_voltage(val, &self.resolution))
+            Ok(calculate_voltage(val, &config.resolution))
         }
     }
 
