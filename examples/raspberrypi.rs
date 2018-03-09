@@ -9,14 +9,14 @@ fn main() {
 
     let dev = I2cdev::new("/dev/i2c-1").unwrap();
     let address = 0x68;
-    let mut adc = MCP3425::new(dev, address, Delay);
+    let mut adc = MCP3425::oneshot(dev, address, Delay);
     let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
 
-    println!("Temperature 12 bit / 1x gain: {:?}", adc.oneshot(&config).map_err(|e| format!("{:?}", e)));
+    println!("Temperature 12 bit / 1x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
     let config = config.with_resolution(Resolution::Bits14Sps60);
-    println!("Temperature 14 bit / 1x gain: {:?}", adc.oneshot(&config).map_err(|e| format!("{:?}", e)));
+    println!("Temperature 14 bit / 1x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
     let config = config.with_resolution(Resolution::Bits16Sps15);
-    println!("Temperature 16 bit / 1x gain: {:?}", adc.oneshot(&config).map_err(|e| format!("{:?}", e)));
+    println!("Temperature 16 bit / 1x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
     let config = config.with_gain(Gain::Gain2);
-    println!("Temperature 16 bit / 2x gain: {:?}", adc.oneshot(&config).map_err(|e| format!("{:?}", e)));
+    println!("Temperature 16 bit / 2x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
 }

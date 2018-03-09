@@ -20,28 +20,37 @@
 //! extern crate mcp3425;
 //! ```
 //!
-//! Then instantiate the device:
+//! Then instantiate the device in either
+//! [`ContinuousMode`](struct.ContinuousMode.html) or
+//! [`OneShotMode`](struct.OneOneShotMode.html):
 //!
 //! ```no_run
 //! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
 //! use hal::{Delay, I2cdev};
-//! use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
+//! use mcp3425::{MCP3425, Config, Resolution, Gain, Error, OneShotMode};
 //!
 //! # fn main() {
 //! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! let address = 0x68;
-//! let mut adc = MCP3425::new(dev, address, Delay);
+//! let mut adc = MCP3425::new(dev, address, Delay, OneShotMode);
 //! # }
 //! ```
+//!
+//! (You can also use the shortcut functions
+//! [`oneshot`](struct.MCP3425.html#method.oneshot) or
+//! [`continuous`](struct.MCP3425.html#method.continuous) to create instances
+//! of the [`MCP3425`](struct.MCP3425.html) type without having to specify the
+//! type as parameter.)
 //!
 //! ### Configuration
 //!
 //! You can choose the conversion resolution / sample rate and the PGA gain
 //! with a [`Config`](struct.Config.html) object.
 //!
-//! You can use the methods starting with `with_` to create a new instance of
-//! the configuration where the specified setting has been replaced.
+//! You can use the methods starting with `with_` to create a (side-effect
+//! free) new instance of the configuration where the specified setting has
+//! been replaced.
 //!
 //! ```no_run
 //! # extern crate mcp3425;
@@ -65,9 +74,9 @@
 //! # fn main() {
 //! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
-//! # let mut adc = MCP3425::new(dev, address, Delay);
+//! let mut adc = MCP3425::oneshot(dev, address, Delay);
 //! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
-//! match adc.oneshot(&config) {
+//! match adc.measure(&config) {
 //!     Ok(mv) => println!("ADC measured {} mV", mv),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
 //!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
@@ -112,18 +121,29 @@ const REF_MILLIVOLTS: i16 = 2048;
 const START_CONVERSION: u8 = 0b10000000;
 
 
-/// Conversion mode.
-#[allow(dead_code)]
-#[derive(Debug, Copy, Clone)]
-enum ConversionMode {
-    OneShot = 0b00000000,
-    Continuous = 0b00010000,
+/// The two conversion mode structs implement this trait.
+///
+/// This allows the `MCP3425` instance to be generic over the conversion mode.
+pub trait ConversionMode {
+    /// Return the bitmask for this conversion mode
+    fn val(&self) -> u8;
 }
 
-impl ConversionMode {
-    /// Return the bitmask for this conversion mode.
-    pub fn val(&self) -> u8 {
-        *self as u8
+/// Use the MCP3425 in One-Shot mode.
+pub struct OneShotMode;
+
+impl ConversionMode for OneShotMode {
+    fn val(&self) -> u8 {
+        0b00000000
+    }
+}
+
+/// Use the MCP3425 in Continuous Conversion mode.
+pub struct ContinuousMode;
+
+impl ConversionMode for ContinuousMode {
+    fn val(&self) -> u8 {
+        0b00010000
     }
 }
 
@@ -263,23 +283,49 @@ impl Config {
 
 /// Driver for the MCP3425 ADC
 #[derive(Debug, Default)]
-pub struct MCP3425<I2C, D> {
+pub struct MCP3425<I2C, D, M> {
     i2c: I2C,
     address: u8,
     delay: D,
+    mode: M,
 }
 
-impl<I2C, D, E> MCP3425<I2C, D>
+impl<I2C, D, E, M> MCP3425<I2C, D, M>
 where
     I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
     D: DelayMs<u8>,
+    M: ConversionMode,
 {
     /// Initialize the MCP3425 driver.
-    pub fn new(i2c: I2C, address: u8, delay: D) -> Self {
+    pub fn new(i2c: I2C, address: u8, delay: D, mode: M) -> Self {
         MCP3425 {
             i2c,
             address,
             delay,
+            mode,
+        }
+    }
+
+    /// Read an i16 from the device.
+    fn read_i16(&mut self) -> Result<i16, Error<E>> {
+        let mut buf = [0, 0];
+        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
+        Ok(BigEndian::read_i16(&buf))
+    }
+}
+
+impl<I2C, D, E> MCP3425<I2C, D, OneShotMode>
+where
+    I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
+    D: DelayMs<u8>,
+{
+    /// Initialize the MCP3425 driver in One-Shot mode.
+    pub fn oneshot(i2c: I2C, address: u8, delay: D) -> Self {
+        MCP3425 {
+            i2c,
+            address,
+            delay,
+            mode: OneShotMode,
         }
     }
 
@@ -288,9 +334,9 @@ where
     /// Return the result in millivolts.
     ///
     /// TODO: Newtype for return value.
-    pub fn oneshot(&mut self, config: &Config) -> Result<i16, Error<E>> {
+    pub fn measure(&mut self, config: &Config) -> Result<i16, Error<E>> {
         let command = START_CONVERSION
-                    | ConversionMode::OneShot.val()
+                    | self.mode.val()
                     | config.resolution.val()
                     | config.gain.val();
 
@@ -314,14 +360,26 @@ where
             Ok(calculate_voltage(val, &config.resolution))
         }
     }
-
-    /// Read an i16 from the device.
-    fn read_i16(&mut self) -> Result<i16, Error<E>> {
-        let mut buf = [0, 0];
-        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        Ok(BigEndian::read_i16(&buf))
-    }
 }
+
+
+impl<I2C, D, E> MCP3425<I2C, D, ContinuousMode>
+where
+    I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
+    D: DelayMs<u8>,
+{
+    /// Initialize the MCP3425 driver in Continuous Measurement mode.
+    pub fn continuous(i2c: I2C, address: u8, delay: D) -> Self {
+        MCP3425 {
+            i2c,
+            address,
+            delay,
+            mode: ContinuousMode,
+        }
+    }
+
+}
+
 
 /// Calculate the voltage for the measurement result at the specified sample rate.
 fn calculate_voltage(measurement: i16, resolution: &Resolution) -> i16 {
