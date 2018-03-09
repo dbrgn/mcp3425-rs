@@ -20,6 +20,7 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 
 - [x] Support one-shot measurements
 - [ ] Support continuous measurements
+- [ ] Support device reset (I²C General Call Reset command)
 - [x] Configurable sample rate / resolution
 - [x] Configurable gain (PGA)
 - [x] Handle saturation values (high and low)
