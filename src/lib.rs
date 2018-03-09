@@ -47,8 +47,8 @@
 //! # extern crate mcp3425;
 //! # use mcp3425::{Config, Resolution, Gain};
 //! # fn main() {
-//! let config = Config::new(Resolution::SPS240Bits12, Gain::Gain1);
-//! let high_res = config.with_resolution(Resolution::SPS15Bits16);
+//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! let high_res = config.with_resolution(Resolution::Bits16Sps15);
 //! let high_gain = high_res.with_gain(Gain::Gain8);
 //! # }
 //! ```
@@ -66,7 +66,7 @@
 //! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! # let mut adc = MCP3425::new(dev, address, Delay);
-//! let config = Config::new(Resolution::SPS240Bits12, Gain::Gain1);
+//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
 //! match adc.oneshot(&config) {
 //!     Ok(mv) => println!("ADC measured {} mV", mv),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
@@ -134,17 +134,17 @@ impl ConversionMode {
 /// * 60 SPS -> 14 bits
 /// * 240 SPS -> 12 bits
 ///
-/// Defaults to 240 SPS / 12 bits (`SPS240Bits12`),
+/// Defaults to 12 bits / 240 SPS (`Bits12Sps240`),
 /// matching the power-on defaults of the device.
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 pub enum Resolution {
-    /// 15 SPS / 16 bits. This allows you to measure voltage in 62.5 µV steps.
-    SPS15Bits16 = 0b00001000,
-    /// 60 SPS / 14 bits. This allows you to measure voltage in 250 µV steps.
-    SPS60Bits14 = 0b00000100,
-    /// 240 SPS / 12 bits. This allows you to measure voltage in 1 mV steps.
-    SPS240Bits12 = 0b00000000,
+    /// 16 bits / 15 SPS. This allows you to measure voltage in 62.5 µV steps.
+    Bits16Sps15 = 0b00001000,
+    /// 14 bits / 60 SPS. This allows you to measure voltage in 250 µV steps.
+    Bits14Sps60 = 0b00000100,
+    /// 12 bits / 240 SPS. This allows you to measure voltage in 1 mV steps.
+    Bits12Sps240 = 0b00000000,
 }
 
 impl Resolution {
@@ -156,27 +156,27 @@ impl Resolution {
     /// Return the number of bits of accuracy this sample rate gives you.
     pub fn bits(&self) -> u8 {
         match *self {
-            Resolution::SPS15Bits16 => 16,
-            Resolution::SPS60Bits14 => 14,
-            Resolution::SPS240Bits12 => 12,
+            Resolution::Bits16Sps15 => 16,
+            Resolution::Bits14Sps60 => 14,
+            Resolution::Bits12Sps240 => 12,
         }
     }
 
     /// Return the maximum output code.
     pub fn max(&self) -> i16 {
         match *self {
-            Resolution::SPS15Bits16 => 32767,
-            Resolution::SPS60Bits14 => 8191,
-            Resolution::SPS240Bits12 => 2047,
+            Resolution::Bits16Sps15 => 32767,
+            Resolution::Bits14Sps60 => 8191,
+            Resolution::Bits12Sps240 => 2047,
         }
     }
 
     /// Return the minimum output code.
     pub fn min(&self) -> i16 {
         match *self {
-            Resolution::SPS15Bits16 => -32768,
-            Resolution::SPS60Bits14 => -8192,
-            Resolution::SPS240Bits12 => -2048,
+            Resolution::Bits16Sps15 => -32768,
+            Resolution::Bits14Sps60 => -8192,
+            Resolution::Bits12Sps240 => -2048,
         }
     }
 }
@@ -184,7 +184,7 @@ impl Resolution {
 impl Default for Resolution {
     /// Default implementation matching the power-on defaults of the device.
     fn default() -> Self {
-        Resolution::SPS240Bits12
+        Resolution::Bits12Sps240
     }
 }
 
