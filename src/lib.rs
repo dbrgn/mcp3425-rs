@@ -1,6 +1,102 @@
-//! Platform agnostic driver for the Microchip MCP3425 16-bit ADC.
+//! A platform agnostic Rust driver for the MCP3425, based on the
+//! [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+//!
+//! ## The Device
+//!
+//! The Microchip MCP3425 is a low-current 16-bit analog-to-digital converter.
+//!
+//! The device has an I²C interface and an on-board ±2048mV reference.
+//!
+//! - [Details and datasheet](http://www.microchip.com/wwwproducts/en/en533561)
+//!
+//! ## Usage
+//!
+//! ### Instantiating
+//!
+//! Import this crate and an `embedded_hal` implementation:
+//!
+//! ```
+//! extern crate linux_embedded_hal as hal;
+//! extern crate mcp3425;
+//! ```
+//!
+//! Then instantiate the device:
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate mcp3425;
+//! use hal::{Delay, I2cdev};
+//! use mcp3425::{MCP3425, SampleRate, Gain, Error};
+//!
+//! # fn main() {
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let address = 0x68;
+//! let mut adc = MCP3425::new(dev, address, Delay);
+//! # }
+//! ```
+//!
+//! ### Configuration
+//!
+//! You can use the methods starting with `with_` to configure the device in a
+//! chained fashion:
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate mcp3425;
+//! # use hal::{Delay, I2cdev};
+//! # use mcp3425::{MCP3425, SampleRate, Gain};
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let address = 0x68;
+//! let mut adc = MCP3425::new(dev, address, Delay)
+//!     .with_sample_rate(SampleRate::SPS240Bits12)
+//!     .with_gain(Gain::Gain1);
+//! # }
+//! ```
+//!
+//! Or you can use the methods starting with `set_` to mutate the instance in-place.
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate mcp3425;
+//! # use hal::{Delay, I2cdev};
+//! # use mcp3425::{MCP3425, SampleRate, Gain};
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let address = 0x68;
+//! let mut adc = MCP3425::new(dev, address, Delay);
+//! adc.set_sample_rate(SampleRate::SPS240Bits12);
+//! adc.set_gain(Gain::Gain1);
+//! # }
+//! ```
+//!
+//! ### Measurements
+//!
+//! You can trigger a one-shot measurement:
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate mcp3425;
+//! # use hal::{Delay, I2cdev};
+//! # use mcp3425::{MCP3425, Error};
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let address = 0x68;
+//! # let mut adc = MCP3425::new(dev, address, Delay);
+//! match adc.oneshot() {
+//!     Ok(mv) => println!("ADC measured {} mV", mv),
+//!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
+//!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
+//!     Err(Error::VoltageTooLow) => println!("Voltage is too low to measure"),
+//! }
+//! # }
+//! ```
+//!
+//! As you can see, the saturation values are automatically converted to
+//! proper errors.
 
 #![no_std]
+#![deny(missing_docs)]
 
 extern crate byteorder;
 extern crate embedded_hal as hal;
@@ -10,7 +106,7 @@ use hal::blocking::delay::DelayMs;
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
 
-/// All possible errors.
+/// All possible errors in this crate
 #[derive(Debug)]
 pub enum Error<E> {
     /// I2C bus error
@@ -34,7 +130,7 @@ const START_CONVERSION: u8 = 0b10000000;
 
 /// Conversion mode.
 ///
-/// Defaults to `OneShot`.
+/// Defaults to single conversion (`OneShot`).
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 enum ConversionMode {
@@ -43,6 +139,7 @@ enum ConversionMode {
 }
 
 impl ConversionMode {
+    /// Return the bitmask for this conversion mode.
     pub fn val(&self) -> u8 {
         *self as u8
     }
@@ -55,13 +152,13 @@ impl Default for ConversionMode {
 }
 
 
-/// Sample rate / accuracy.
+/// Sample rate / accuracy
 ///
 /// * 15 SPS -> 16 bits
 /// * 60 SPS -> 14 bits
 /// * 240 SPS -> 12 bits
 ///
-/// Defaults to 15 SP / 16 bits.
+/// Defaults to 15 SP / 16 bits (`SPS15Bits16`).
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 pub enum SampleRate {
@@ -74,10 +171,12 @@ pub enum SampleRate {
 }
 
 impl SampleRate {
+    /// Return the bitmask for this sample rate.
     pub fn val(&self) -> u8 {
         *self as u8
     }
 
+    /// Return the number of bits of accuracy this sample rate gives you.
     pub fn bits(&self) -> u8 {
         match *self {
             SampleRate::SPS15Bits16 => 16,
@@ -112,19 +211,24 @@ impl Default for SampleRate {
 }
 
 
-/// Programmable gain amplifier (PGA).
+/// Programmable gain amplifier (PGA)
 ///
 /// Defaults to no amplification (`Gain1`).
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 pub enum Gain {
+    /// Amplification factor 1.
     Gain1 = 0b00000000,
+    /// Amplification factor 2.
     Gain2 = 0b00000001,
+    /// Amplification factor 4.
     Gain4 = 0b00000010,
+    /// Amplification factor 8.
     Gain8 = 0b00000011,
 }
 
 impl Gain {
+    /// Return the bitmask for this gain configuration.
     pub fn val(&self) -> u8 {
         *self as u8
     }
@@ -137,7 +241,7 @@ impl Default for Gain {
 }
 
 
-/// MCP3425 driver
+/// Driver for the MCP3425 ADC
 #[derive(Debug, Default)]
 pub struct MCP3425<I2C, D> {
     i2c: I2C,

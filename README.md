@@ -23,7 +23,7 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 - [x] Configurable sample rate / resolution
 - [x] Configurable gain (PGA)
 - [x] Handle saturation values (high and low)
-- [ ] Docs
+- [x] Docs
 
 
 ## License
