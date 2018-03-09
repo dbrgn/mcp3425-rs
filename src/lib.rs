@@ -26,7 +26,7 @@
 //! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
 //! use hal::{Delay, I2cdev};
-//! use mcp3425::{MCP3425, SampleRate, Gain, Error};
+//! use mcp3425::{MCP3425, Resolution, Gain, Error};
 //!
 //! # fn main() {
 //! let dev = I2cdev::new("/dev/i2c-1").unwrap();
@@ -44,12 +44,12 @@
 //! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
 //! # use hal::{Delay, I2cdev};
-//! # use mcp3425::{MCP3425, SampleRate, Gain};
+//! # use mcp3425::{MCP3425, Resolution, Gain};
 //! # fn main() {
 //! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::new(dev, address, Delay)
-//!     .with_sample_rate(SampleRate::SPS240Bits12)
+//!     .with_resolution(Resolution::SPS240Bits12)
 //!     .with_gain(Gain::Gain1);
 //! # }
 //! ```
@@ -60,12 +60,12 @@
 //! # extern crate linux_embedded_hal as hal;
 //! # extern crate mcp3425;
 //! # use hal::{Delay, I2cdev};
-//! # use mcp3425::{MCP3425, SampleRate, Gain};
+//! # use mcp3425::{MCP3425, Resolution, Gain};
 //! # fn main() {
 //! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::new(dev, address, Delay);
-//! adc.set_sample_rate(SampleRate::SPS240Bits12);
+//! adc.set_resolution(Resolution::SPS240Bits12);
 //! adc.set_gain(Gain::Gain1);
 //! # }
 //! ```
@@ -152,7 +152,7 @@ impl Default for ConversionMode {
 }
 
 
-/// Sample rate / accuracy
+/// Conversion bit resolution and sample rate
 ///
 /// * 15 SPS -> 16 bits
 /// * 60 SPS -> 14 bits
@@ -161,7 +161,7 @@ impl Default for ConversionMode {
 /// Defaults to 15 SP / 16 bits (`SPS15Bits16`).
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
-pub enum SampleRate {
+pub enum Resolution {
     /// 15 SPS / 16 bits
     SPS15Bits16 = 0b00001000,
     /// 60 SPS / 14 bits
@@ -170,7 +170,7 @@ pub enum SampleRate {
     SPS240Bits12 = 0b00000000,
 }
 
-impl SampleRate {
+impl Resolution {
     /// Return the bitmask for this sample rate.
     pub fn val(&self) -> u8 {
         *self as u8
@@ -179,34 +179,34 @@ impl SampleRate {
     /// Return the number of bits of accuracy this sample rate gives you.
     pub fn bits(&self) -> u8 {
         match *self {
-            SampleRate::SPS15Bits16 => 16,
-            SampleRate::SPS60Bits14 => 14,
-            SampleRate::SPS240Bits12 => 12,
+            Resolution::SPS15Bits16 => 16,
+            Resolution::SPS60Bits14 => 14,
+            Resolution::SPS240Bits12 => 12,
         }
     }
 
     /// Return the maximum output code.
     pub fn max(&self) -> i16 {
         match *self {
-            SampleRate::SPS15Bits16 => 32767,
-            SampleRate::SPS60Bits14 => 8191,
-            SampleRate::SPS240Bits12 => 2047,
+            Resolution::SPS15Bits16 => 32767,
+            Resolution::SPS60Bits14 => 8191,
+            Resolution::SPS240Bits12 => 2047,
         }
     }
 
     /// Return the minimum output code.
     pub fn min(&self) -> i16 {
         match *self {
-            SampleRate::SPS15Bits16 => -32768,
-            SampleRate::SPS60Bits14 => -8192,
-            SampleRate::SPS240Bits12 => -2048,
+            Resolution::SPS15Bits16 => -32768,
+            Resolution::SPS60Bits14 => -8192,
+            Resolution::SPS240Bits12 => -2048,
         }
     }
 }
 
-impl Default for SampleRate {
+impl Default for Resolution {
     fn default() -> Self {
-        SampleRate::SPS15Bits16
+        Resolution::SPS15Bits16
     }
 }
 
@@ -247,7 +247,7 @@ pub struct MCP3425<I2C, D> {
     i2c: I2C,
     address: u8,
     delay: D,
-    sample_rate: SampleRate,
+    resolution: Resolution,
     gain: Gain,
 }
 
@@ -262,20 +262,20 @@ where
             i2c,
             address,
             delay,
-            sample_rate: Default::default(),
+            resolution: Default::default(),
             gain: Default::default(),
         }
     }
 
     /// Set the sample rate (chained variant).
-    pub fn with_sample_rate(mut self, sample_rate: SampleRate) -> Self {
-        self.sample_rate = sample_rate;
+    pub fn with_resolution(mut self, resolution: Resolution) -> Self {
+        self.resolution = resolution;
         self
     }
 
     /// Set the sample rate (mutating variant).
-    pub fn set_sample_rate(&mut self, sample_rate: SampleRate) {
-        self.sample_rate = sample_rate;
+    pub fn set_resolution(&mut self, resolution: Resolution) {
+        self.resolution = resolution;
     }
 
     /// Set the gain (chained variant).
@@ -301,7 +301,7 @@ where
     pub fn oneshot(&mut self) -> Result<i16, Error<E>> {
         let command = START_CONVERSION
                     | ConversionMode::OneShot.val()
-                    | self.sample_rate.val()
+                    | self.resolution.val()
                     | self.gain.val();
 
         // Send command
@@ -316,12 +316,12 @@ where
         let val = self.read_i16()?;
 
         // Check against min/max codes
-        if val == self.sample_rate.max() {
+        if val == self.resolution.max() {
             Err(Error::VoltageTooHigh)
-        } else if val == self.sample_rate.min() {
+        } else if val == self.resolution.min() {
             Err(Error::VoltageTooLow)
         } else {
-            Ok(calculate_voltage(val, &self.sample_rate))
+            Ok(calculate_voltage(val, &self.resolution))
         }
     }
 
@@ -334,9 +334,9 @@ where
 }
 
 /// Calculate the voltage for the measurement result at the specified sample rate.
-fn calculate_voltage(measurement: i16, sample_rate: &SampleRate) -> i16 {
+fn calculate_voltage(measurement: i16, resolution: &Resolution) -> i16 {
     let converted = measurement as i32
         * (REF_MILLIVOLTS * 2) as i32
-        / (1 << sample_rate.bits()) as i32;
+        / (1 << resolution.bits()) as i32;
     converted as i16
 }
