@@ -113,8 +113,6 @@ const START_CONVERSION: u8 = 0b10000000;
 
 
 /// Conversion mode.
-///
-/// Defaults to single conversion (`OneShot`).
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 enum ConversionMode {
@@ -129,12 +127,6 @@ impl ConversionMode {
     }
 }
 
-impl Default for ConversionMode {
-    fn default() -> Self {
-        ConversionMode::OneShot
-    }
-}
-
 
 /// Conversion bit resolution and sample rate
 ///
@@ -142,7 +134,8 @@ impl Default for ConversionMode {
 /// * 60 SPS -> 14 bits
 /// * 240 SPS -> 12 bits
 ///
-/// Defaults to 15 SP / 16 bits (`SPS15Bits16`).
+/// Defaults to 240 SPS / 12 bits (`SPS240Bits12`),
+/// matching the power-on defaults of the device.
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 pub enum Resolution {
@@ -189,15 +182,17 @@ impl Resolution {
 }
 
 impl Default for Resolution {
+    /// Default implementation matching the power-on defaults of the device.
     fn default() -> Self {
-        Resolution::SPS15Bits16
+        Resolution::SPS240Bits12
     }
 }
 
 
 /// Programmable gain amplifier (PGA)
 ///
-/// Defaults to no amplification (`Gain1`).
+/// Defaults to no amplification (`Gain1`),
+/// matching the power-on defaults of the device.
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 pub enum Gain {
@@ -219,6 +214,7 @@ impl Gain {
 }
 
 impl Default for Gain {
+    /// Default implementation matching the power-on defaults of the device.
     fn default() -> Self {
         Gain::Gain1
     }
