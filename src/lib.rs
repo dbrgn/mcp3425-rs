@@ -124,7 +124,7 @@ const REF_MILLIVOLTS: i16 = 2048;
 
 /// User register value to start a conversion.
 ///
-/// This sets the "Ready" bit to 1.
+/// This sets the "Not Ready" bit to 1.
 const START_CONVERSION: u8 = 0b10000000;
 
 
@@ -162,11 +162,11 @@ impl Default for ConversionMode {
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
 pub enum Resolution {
-    /// 15 SPS / 16 bits
+    /// 15 SPS / 16 bits. This allows you to measure voltage in 62.5 µV steps.
     SPS15Bits16 = 0b00001000,
-    /// 60 SPS / 14 bits
+    /// 60 SPS / 14 bits. This allows you to measure voltage in 250 µV steps.
     SPS60Bits14 = 0b00000100,
-    /// 240 SPS / 12 bits
+    /// 240 SPS / 12 bits. This allows you to measure voltage in 1 mV steps.
     SPS240Bits12 = 0b00000000,
 }
 
