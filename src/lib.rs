@@ -81,6 +81,7 @@
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
 //!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
 //!     Err(Error::VoltageTooLow) => println!("Voltage is too low to measure"),
+//!     Err(Error::NotInitialized) => unreachable!(),
 //! }
 //! # }
 //! ```
@@ -104,10 +105,13 @@ use hal::blocking::i2c::{Read, Write, WriteRead};
 pub enum Error<E> {
     /// I2C bus error
     I2c(E),
-    /// Voltage is too high to be measured
+    /// Voltage is too high to be measured.
     VoltageTooHigh,
-    /// Voltage is too low to be measured
+    /// Voltage is too low to be measured.
     VoltageTooLow,
+    /// A measurement in continuous mode has been triggered without previously
+    /// writing the configuration to the device.
+    NotInitialized,
 }
 
 
@@ -244,9 +248,9 @@ impl Default for Gain {
 /// Device configuration: Resolution and gain
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Config {
-    /// Conversion bit resolution and sample rate
+    /// Conversion bit resolution and sample rate.
     pub resolution: Resolution,
-    /// Programmable gain amplifier (PGA)
+    /// Programmable gain amplifier (PGA).
     pub gain: Gain,
 }
 
@@ -286,13 +290,36 @@ impl Config {
 }
 
 
+/// This enum wraps the measurements read in continuous conversion mode.
+///
+/// The two enum types indicate whether the measurement is fresh, or whether it
+/// has already been read previously (either because no measurement has been
+/// ready since the last reset, or because not enough time has passed since the
+/// last measurement).
+///
+/// See datasheet section 5.1.1 for more details.
+#[derive(Debug, Copy, Clone)]
+pub enum Measurement {
+    /// The measurement is fresh.
+    Fresh(i16),
+    /// The conversion result has not been updated since the last reading.
+    NotFresh(i16),
+}
+
+
 /// Driver for the MCP3425 ADC
 #[derive(Debug, Default)]
 pub struct MCP3425<I2C, D, M> {
+    /// The concrete I²C device implementation.
     i2c: I2C,
+    /// The I²C device address.
     address: u8,
+    /// The concrete Delay implementation.
     delay: D,
+    /// The ADC conversion mode.
     mode: M,
+    /// The configuration being used by the last measurement.
+    config: Option<Config>,
 }
 
 impl<I2C, D, E, M> MCP3425<I2C, D, M>
@@ -302,20 +329,34 @@ where
     M: ConversionMode,
 {
     /// Initialize the MCP3425 driver.
+    ///
+    /// This constructor is side-effect free, so it will not write any
+    /// configuration to the device until a first measurement is triggered.
     pub fn new(i2c: I2C, address: u8, delay: D, mode: M) -> Self {
         MCP3425 {
             i2c,
             address,
             delay,
             mode,
+            config: None,
         }
     }
 
-    /// Read an i16 from the device.
-    fn read_i16(&mut self) -> Result<i16, Error<E>> {
-        let mut buf = [0, 0];
-        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        Ok(BigEndian::read_i16(&buf))
+    /// Calculate the voltage for the measurement result at the specified sample rate.
+    ///
+    /// If the value is a saturation value, an error is returned.
+    fn calculate_voltage(&self, measurement: i16, resolution: &Resolution) -> Result<i16, Error<E>> {
+        // Handle saturation / out of range values
+        if measurement == resolution.max() {
+            return Err(Error::VoltageTooHigh)
+        } else if measurement == resolution.min() {
+            return Err(Error::VoltageTooLow)
+        }
+
+        let converted = measurement as i32
+            * (REF_MILLIVOLTS * 2) as i32
+            / (1 << resolution.bits()) as i32;
+        Ok(converted as i16)
     }
 }
 
@@ -325,12 +366,16 @@ where
     D: DelayMs<u8>,
 {
     /// Initialize the MCP3425 driver in One-Shot mode.
+    ///
+    /// This constructor is side-effect free, so it will not write any
+    /// configuration to the device until a first measurement is triggered.
     pub fn oneshot(i2c: I2C, address: u8, delay: D) -> Self {
         MCP3425 {
             i2c,
             address,
             delay,
             mode: OneShotMode,
+            config: None,
         }
     }
 
@@ -350,19 +395,21 @@ where
             .map_err(Error::I2c)?;
 
         // Wait for conversion to finish
+        // TODO: Check this delay!
         self.delay.delay_ms(150);
 
         // Read result
-        let val = self.read_i16()?;
+        let measurement = self.read_i16()?;
 
-        // Check against min/max codes
-        if val == config.resolution.max() {
-            Err(Error::VoltageTooHigh)
-        } else if val == config.resolution.min() {
-            Err(Error::VoltageTooLow)
-        } else {
-            Ok(calculate_voltage(val, &config.resolution))
-        }
+        // Calculate voltage from raw value
+        self.calculate_voltage(measurement, &config.resolution)
+    }
+
+    /// Read an i16 from the device.
+    fn read_i16(&mut self) -> Result<i16, Error<E>> {
+        let mut buf = [0, 0];
+        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
+        Ok(BigEndian::read_i16(&buf))
     }
 }
 
@@ -373,22 +420,66 @@ where
     D: DelayMs<u8>,
 {
     /// Initialize the MCP3425 driver in Continuous Measurement mode.
+    ///
+    /// This constructor is side-effect free, so it will not write any
+    /// configuration to the device until a first measurement is triggered.
     pub fn continuous(i2c: I2C, address: u8, delay: D) -> Self {
         MCP3425 {
             i2c,
             address,
             delay,
             mode: ContinuousMode,
+            config: None,
         }
     }
 
-}
+    /// Write the specified configuration to the device.
+    pub fn set_config(&mut self, config: &Config) -> Result<(), Error<E>> {
+        let command = self.mode.val() | config.val();
+        self.i2c
+            .write(self.address, &[command])
+            .map(|()| self.config = Some(*config))
+            .map_err(Error::I2c)
+    }
 
+    /// Read a measurement from the device.
+    ///
+    /// Note that the [`set_config`](struct.MCP3425.html#method.set_config)
+    /// method MUST have been called before, otherwise
+    /// [`Error::NotInitialized`](enum.Error.html#variant.NotInitialized) will
+    /// be returned.
+    pub fn read_measurement(&mut self) -> Result<Measurement, Error<E>> {
+        // Make sure that the configuration has been written to the device
+        let config = self.config.ok_or(Error::NotInitialized)?;
 
-/// Calculate the voltage for the measurement result at the specified sample rate.
-fn calculate_voltage(measurement: i16, resolution: &Resolution) -> i16 {
-    let converted = measurement as i32
-        * (REF_MILLIVOLTS * 2) as i32
-        / (1 << resolution.bits()) as i32;
-    converted as i16
+        // Read measurement and config register
+        let (measurement, config_reg) = self.read_i16_and_config()?;
+
+        // Calculate voltage from raw value
+        let voltage = self.calculate_voltage(measurement, &config.resolution)?;
+
+        // Check "Not Ready" flag. See datasheet section 5.1.1 for more details.
+        match config_reg & 0b10000000 {
+            0b10000000 => {
+                // The "Not Ready" flag is set. This means the conversion
+                // result is not updated since the last reading. A new
+                // conversion is under processing and the RDY bit will be
+                // cleared when the new conversion result is ready.
+                Ok(Measurement::NotFresh(voltage))
+            }
+            0b00000000 => {
+                // THe "Not Ready" flag is not set. This means the latest
+                // conversion result is ready.
+                Ok(Measurement::Fresh(voltage))
+            }
+            _ => unreachable!()
+        }
+    }
+
+    /// Read an i16 and the configuration register from the device.
+    fn read_i16_and_config(&mut self) -> Result<(i16, u8), Error<E>> {
+        let mut buf = [0, 0, 0];
+        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
+        Ok((BigEndian::read_i16(&buf[0..2]), buf[2]))
+    }
 }

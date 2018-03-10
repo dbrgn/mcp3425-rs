@@ -19,11 +19,12 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 ## Status
 
 - [x] Support one-shot measurements
-- [ ] Support continuous measurements
+- [x] Support continuous measurements
 - [x] Configurable sample rate / resolution
 - [x] Configurable gain (PGA)
 - [x] Handle saturation values (high and low)
 - [x] Docs
+- [ ] Polish & release to crates.io
 
 
 ## License
