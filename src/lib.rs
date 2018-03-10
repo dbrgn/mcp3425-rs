@@ -22,7 +22,7 @@
 //!
 //! Then instantiate the device in either
 //! [`ContinuousMode`](struct.ContinuousMode.html) or
-//! [`OneShotMode`](struct.OneOneShotMode.html):
+//! [`OneShotMode`](struct.OneShotMode.html):
 //!
 //! ```no_run
 //! # extern crate linux_embedded_hal as hal;
@@ -48,9 +48,9 @@
 //! You can choose the conversion resolution / sample rate and the PGA gain
 //! with a [`Config`](struct.Config.html) object.
 //!
-//! You can use the methods starting with `with_` to create a (side-effect
-//! free) new instance of the configuration where the specified setting has
-//! been replaced.
+//! Use the methods starting with `with_` to create a (side-effect free) new
+//! instance of the configuration where the specified setting has been
+//! replaced.
 //!
 //! ```no_run
 //! # extern crate mcp3425;
