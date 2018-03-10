@@ -278,6 +278,11 @@ impl Config {
             gain,
         }
     }
+
+    /// Return the bitmask for the combined configuration values.
+    fn val(&self) -> u8 {
+        self.resolution.val() | self.gain.val()
+    }
 }
 
 
@@ -337,8 +342,7 @@ where
     pub fn measure(&mut self, config: &Config) -> Result<i16, Error<E>> {
         let command = START_CONVERSION
                     | self.mode.val()
-                    | config.resolution.val()
-                    | config.gain.val();
+                    | config.val();
 
         // Send command
         self.i2c
