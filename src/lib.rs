@@ -92,6 +92,7 @@
 #![no_std]
 #![deny(missing_docs)]
 
+#[macro_use] extern crate bitflags;
 extern crate byteorder;
 extern crate embedded_hal as hal;
 
@@ -115,14 +116,20 @@ pub enum Error<E> {
 }
 
 
+bitflags! {
+    struct ConfigRegister: u8 {
+        const NOT_READY = 0b10000000;
+        const MODE = 0b00010000;
+        const SAMPLE_RATE_H = 0b00001000;
+        const SAMPLE_RATE_L = 0b00000100;
+        const GAIN_H = 0b00000010;
+        const GAIN_L = 0b00000001;
+    }
+}
+
+
 /// ADC reference voltage: +-2048mV
 const REF_MILLIVOLTS: i16 = 2048;
-
-
-/// User register value to start a conversion.
-///
-/// This sets the "Not Ready" bit to 1.
-const START_CONVERSION: u8 = 0b10000000;
 
 
 /// The two conversion mode structs implement this trait.
@@ -130,14 +137,14 @@ const START_CONVERSION: u8 = 0b10000000;
 /// This allows the `MCP3425` instance to be generic over the conversion mode.
 pub trait ConversionMode {
     /// Return the bitmask for this conversion mode
-    fn val(&self) -> u8;
+    fn bits(&self) -> u8;
 }
 
 /// Use the MCP3425 in One-Shot mode.
 pub struct OneShotMode;
 
 impl ConversionMode for OneShotMode {
-    fn val(&self) -> u8 {
+    fn bits(&self) -> u8 {
         0b00000000
     }
 }
@@ -146,7 +153,7 @@ impl ConversionMode for OneShotMode {
 pub struct ContinuousMode;
 
 impl ConversionMode for ContinuousMode {
-    fn val(&self) -> u8 {
+    fn bits(&self) -> u8 {
         0b00010000
     }
 }
@@ -173,12 +180,12 @@ pub enum Resolution {
 
 impl Resolution {
     /// Return the bitmask for this sample rate.
-    pub fn val(&self) -> u8 {
+    pub fn bits(&self) -> u8 {
         *self as u8
     }
 
     /// Return the number of bits of accuracy this sample rate gives you.
-    pub fn bits(&self) -> u8 {
+    pub fn res_bits(&self) -> u8 {
         match *self {
             Resolution::Bits16Sps15 => 16,
             Resolution::Bits14Sps60 => 14,
@@ -232,7 +239,7 @@ pub enum Gain {
 
 impl Gain {
     /// Return the bitmask for this gain configuration.
-    pub fn val(&self) -> u8 {
+    pub fn bits(&self) -> u8 {
         *self as u8
     }
 }
@@ -284,8 +291,8 @@ impl Config {
     }
 
     /// Return the bitmask for the combined configuration values.
-    fn val(&self) -> u8 {
-        self.resolution.val() | self.gain.val()
+    fn bits(&self) -> u8 {
+        self.resolution.bits() | self.gain.bits()
     }
 }
 
@@ -355,7 +362,7 @@ where
 
         let converted = measurement as i32
             * (REF_MILLIVOLTS * 2) as i32
-            / (1 << resolution.bits()) as i32;
+            / (1 << resolution.res_bits()) as i32;
         Ok(converted as i16)
     }
 }
@@ -382,12 +389,10 @@ where
     /// Do a one-shot voltage measurement.
     ///
     /// Return the result in millivolts.
-    ///
-    /// TODO: Newtype for return value.
     pub fn measure(&mut self, config: &Config) -> Result<i16, Error<E>> {
-        let command = START_CONVERSION
-                    | self.mode.val()
-                    | config.val();
+        let command = ConfigRegister::NOT_READY.bits()
+                    | self.mode.bits()
+                    | config.bits();
 
         // Send command
         self.i2c
@@ -444,7 +449,7 @@ where
     /// configuration, that measurement will be returned as `NotFresh`.
     pub fn set_config(&mut self, config: &Config) -> Result<(), Error<E>> {
         // Set configuration
-        let command = self.mode.val() | config.val();
+        let command = self.mode.bits() | config.bits();
         self.i2c
             .write(self.address, &[command])
             .map(|()| self.config = Some(*config))
