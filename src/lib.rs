@@ -407,6 +407,15 @@ where
         }
     }
 
+    /// Change the conversion mode to continuous.
+    ///
+    /// This conversion is side-effect free, so it will not write any
+    /// configuration to the device until
+    /// [`set_config`](struct.MCP3425.html#method.set_config) is called.
+    pub fn into_continuous(self) -> MCP3425<I2C, D, ContinuousMode> {
+        MCP3425::continuous(self.i2c, self.address, self.delay)
+    }
+
     /// Do a one-shot voltage measurement.
     ///
     /// Return the result in millivolts.
@@ -463,6 +472,15 @@ where
             mode: ContinuousMode,
             config: None,
         }
+    }
+
+    /// Change the conversion mode to one-shot.
+    ///
+    /// This conversion is side-effect free, so it will not write any
+    /// configuration to the device until a first one-shot measurement is
+    /// triggered.
+    pub fn into_oneshot(self) -> MCP3425<I2C, D, OneShotMode> {
+        MCP3425::oneshot(self.i2c, self.address, self.delay)
     }
 
     /// Write the specified configuration to the device and block until the
