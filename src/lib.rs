@@ -77,7 +77,7 @@
 //! let mut adc = MCP3425::oneshot(dev, address, Delay);
 //! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
 //! match adc.measure(&config) {
-//!     Ok(voltage) => println!("ADC measured {} mV", voltage.millivolts()),
+//!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
 //!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
 //!     Err(Error::VoltageTooLow) => println!("Voltage is too low to measure"),
@@ -89,6 +89,15 @@
 //!
 //! As you can see, the saturation values are automatically converted to
 //! proper errors.
+//!
+//! ## Feature Flags
+//!
+//! The following feature flags exists:
+//!
+//! - `measurements`: Use the
+//!   [measurements](https://github.com/thejpster/rust-measurements) crate
+//!   to represent voltages instead of the custom
+//!   [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
 
 #![no_std]
 #![deny(missing_docs)]
@@ -100,6 +109,11 @@ extern crate embedded_hal as hal;
 use byteorder::{BigEndian, ByteOrder};
 use hal::blocking::delay::DelayMs;
 use hal::blocking::i2c::{Read, Write, WriteRead};
+
+#[cfg(feature="measurements")]
+extern crate measurements;
+#[cfg(feature="measurements")]
+use measurements::voltage::Voltage;
 
 
 /// All possible errors in this crate
@@ -315,11 +329,13 @@ impl Config {
 
 
 /// A voltage measurement.
+#[cfg(not(feature="measurements"))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Voltage {
     millivolts: i16,
 }
 
+#[cfg(not(feature="measurements"))]
 impl Voltage {
     /// Create a new `Voltage` instance from a millivolt measurement.
     pub fn from_millivolts(millivolts: i16) -> Self {
@@ -327,12 +343,12 @@ impl Voltage {
     }
 
     /// Return the voltage in millivolts.
-    pub fn millivolts(&self) -> i16 {
+    pub fn as_millivolts(&self) -> i16 {
         self.millivolts
     }
 
     /// Return the voltage in volts.
-    pub fn volts(&self) -> f32 {
+    pub fn as_volts(&self) -> f32 {
         self.millivolts as f32 / 1000.0
     }
 }
@@ -396,7 +412,7 @@ where
         let converted = measurement as i32
             * (REF_MILLIVOLTS * 2) as i32
             / (1 << resolution.res_bits()) as i32;
-        Ok(Voltage::from_millivolts(converted as i16))
+        Ok(Voltage::from_millivolts((converted as i16).into()))
     }
 }
 
@@ -576,13 +592,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(feature="measurements"))]
     fn test_voltage_wrapper() {
         let a = Voltage::from_millivolts(2500);
-        assert_eq!(a.millivolts(), 2500i16);
-        assert_eq!(a.volts(), 2.5f32);
+        assert_eq!(a.as_millivolts(), 2500i16);
+        assert_eq!(a.as_volts(), 2.5f32);
 
         let b = Voltage::from_millivolts(-100);
-        assert_eq!(b.millivolts(), -100i16);
-        assert_eq!(b.volts(), -0.1f32);
+        assert_eq!(b.as_millivolts(), -100i16);
+        assert_eq!(b.as_volts(), -0.1f32);
     }
 }
