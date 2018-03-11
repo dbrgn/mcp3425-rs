@@ -48,8 +48,8 @@ be dual licensed as above, without any additional terms or conditions.
 
 
 <!-- Badges -->
-[circle-ci]: https://circleci.com/gh/dbrgn/mcp3425-rs/tree/develop
-[circle-ci-badge]: https://circleci.com/gh/dbrgn/mcp3425-rs/tree/develop.svg?style=shield
+[circle-ci]: https://circleci.com/gh/dbrgn/mcp3425-rs/tree/master
+[circle-ci-badge]: https://circleci.com/gh/dbrgn/mcp3425-rs/tree/master.svg?style=shield
 [crates-io]: https://crates.io/crates/mcp3425
 [crates-io-badge]: https://img.shields.io/crates/v/mcp3425.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/mcp3425
