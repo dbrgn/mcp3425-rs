@@ -81,6 +81,7 @@
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
 //!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
 //!     Err(Error::VoltageTooLow) => println!("Voltage is too low to measure"),
+//!     Err(Error::NotReady) => println!("Measurement not yet ready. This is a driver bug."),
 //!     Err(Error::NotInitialized) => unreachable!(),
 //! }
 //! # }
