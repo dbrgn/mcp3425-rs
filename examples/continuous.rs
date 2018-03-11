@@ -16,7 +16,6 @@ fn main() {
 
     println!("Writing configuration to device: {:?}", &config);
     adc.set_config(&config).unwrap();
-    Delay.delay_ms(150u8);
     println!("Reading measurement: {:?}", &adc.read_measurement().unwrap());
     println!("Sleeping 150ms");
     Delay.delay_ms(150u8);

@@ -433,13 +433,45 @@ where
         }
     }
 
-    /// Write the specified configuration to the device.
+    /// Write the specified configuration to the device and block until the
+    /// first measurement is ready.
+    ///
+    /// The wait-for-measurement logic is implemented with polling, since there
+    /// are no non-blocking `embedded_hal` traits yet.
+    ///
+    /// Note: Since the wait-until-ready logic needs to read the data register,
+    /// when reading the measurement immediately after setting the
+    /// configuration, that measurement will be returned as `NotFresh`.
     pub fn set_config(&mut self, config: &Config) -> Result<(), Error<E>> {
+        // Set configuration
         let command = self.mode.val() | config.val();
         self.i2c
             .write(self.address, &[command])
             .map(|()| self.config = Some(*config))
-            .map_err(Error::I2c)
+            .map_err(Error::I2c)?;
+
+        // Determine time to wait for first measurement.
+        // Values found by experimentation, these do not seem to be specified
+        // in the datasheet.
+        let sleep_ms = match config.resolution {
+            Resolution::Bits12Sps240 => 4,
+            Resolution::Bits14Sps60 => 15,
+            Resolution::Bits16Sps15 => 57,
+        };
+        self.delay.delay_ms(sleep_ms);
+
+        // Poll until ready
+        let mut buf = [0, 0, 0];
+        loop {
+            self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
+            if (buf[2] & 0b10000000) == 0b10000000 {
+                // Not yet ready, wait some more time
+                self.delay.delay_ms(1);
+            } else {
+                break;
+            }
+        }
+        Ok(())
     }
 
     /// Read a measurement from the device.
@@ -468,7 +500,7 @@ where
                 Ok(Measurement::NotFresh(voltage))
             }
             0b00000000 => {
-                // THe "Not Ready" flag is not set. This means the latest
+                // The "Not Ready" flag is not set. This means the latest
                 // conversion result is ready.
                 Ok(Measurement::Fresh(voltage))
             }
