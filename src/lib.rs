@@ -113,6 +113,10 @@ pub enum Error<E> {
     /// A measurement in continuous mode has been triggered without previously
     /// writing the configuration to the device.
     NotInitialized,
+    /// A measurement in one-shot mode returned a stale result.
+    /// This is probably a timing bug that should be reported to
+    /// https://github.com/dbrgn/mcp3425-rs/issues/!
+    NotReady,
 }
 
 
@@ -273,7 +277,8 @@ impl Config {
     ///
     /// Note that creating and changing this instance does not have an
     /// immediate effect on the device. It is only written when a measurement
-    /// is triggered (TODO: Or when writing config explicitly).
+    /// is triggered, or when writing config explicitly with
+    /// [`set_config`](struct.MCP3425.html#method.set_config).
     pub fn new(resolution: Resolution, gain: Gain) -> Self {
         Config { resolution, gain }
     }
@@ -355,6 +360,15 @@ where
         }
     }
 
+    /// Read an i16 and the configuration register from the device.
+    fn read_i16_and_config(&mut self) -> Result<(i16, ConfigRegister), Error<E>> {
+        let mut buf = [0, 0, 0];
+        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
+        let measurement = BigEndian::read_i16(&buf[0..2]);
+        let config_reg = ConfigRegister::from_bits_truncate(buf[2]);
+        Ok((measurement, config_reg))
+    }
+
     /// Calculate the voltage for the measurement result at the specified sample rate.
     ///
     /// If the value is a saturation value, an error is returned.
@@ -405,22 +419,28 @@ where
             .write(self.address, &[command])
             .map_err(Error::I2c)?;
 
-        // Wait for conversion to finish
-        // TODO: Check this delay!
-        self.delay.delay_ms(150);
+        // Determine time to wait for the conversion to finish.
+        // Values found by experimentation, these do not seem to be specified
+        // in the datasheet.
+        let sleep_ms = match config.resolution {
+            Resolution::Bits12Sps240 => 4,
+            Resolution::Bits14Sps60 => 15,
+            Resolution::Bits16Sps15 => 57,
+        };
+        self.delay.delay_ms(sleep_ms + 2); // Add two additional milliseconds as safety margin
 
         // Read result
-        let measurement = self.read_i16()?;
+        let (measurement, config_reg) = self.read_i16_and_config()?;
+
+        // Make sure that the delay was sufficient
+        if !config_reg.is_ready() {
+            return Err(Error::NotReady);
+        }
 
         // Calculate voltage from raw value
-        self.calculate_voltage(measurement, &config.resolution)
-    }
+        let voltage = self.calculate_voltage(measurement, &config.resolution)?;
 
-    /// Read an i16 from the device.
-    fn read_i16(&mut self) -> Result<i16, Error<E>> {
-        let mut buf = [0, 0];
-        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        Ok(BigEndian::read_i16(&buf))
+        Ok(voltage)
     }
 }
 
@@ -513,14 +533,5 @@ where
             // cleared when the new conversion result is ready.
             Ok(Measurement::NotFresh(voltage))
         }
-    }
-
-    /// Read an i16 and the configuration register from the device.
-    fn read_i16_and_config(&mut self) -> Result<(i16, ConfigRegister), Error<E>> {
-        let mut buf = [0, 0, 0];
-        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        let measurement = BigEndian::read_i16(&buf[0..2]);
-        let config_reg = ConfigRegister::from_bits_truncate(buf[2]);
-        Ok((measurement, config_reg))
     }
 }
