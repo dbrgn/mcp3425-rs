@@ -127,6 +127,12 @@ bitflags! {
     }
 }
 
+impl ConfigRegister {
+    fn is_ready(&self) -> bool {
+        !self.contains(ConfigRegister::NOT_READY)
+    }
+}
+
 
 /// ADC reference voltage: +-2048mV
 const REF_MILLIVOLTS: i16 = 2048;
@@ -469,7 +475,7 @@ where
         let mut buf = [0, 0, 0];
         loop {
             self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-            if (buf[2] & 0b10000000) == 0b10000000 {
+            if (buf[2] & ConfigRegister::NOT_READY.bits()) == ConfigRegister::NOT_READY.bits() {
                 // Not yet ready, wait some more time
                 self.delay.delay_ms(1);
             } else {
@@ -496,27 +502,25 @@ where
         let voltage = self.calculate_voltage(measurement, &config.resolution)?;
 
         // Check "Not Ready" flag. See datasheet section 5.1.1 for more details.
-        match config_reg & 0b10000000 {
-            0b10000000 => {
-                // The "Not Ready" flag is set. This means the conversion
-                // result is not updated since the last reading. A new
-                // conversion is under processing and the RDY bit will be
-                // cleared when the new conversion result is ready.
-                Ok(Measurement::NotFresh(voltage))
-            }
-            0b00000000 => {
-                // The "Not Ready" flag is not set. This means the latest
-                // conversion result is ready.
-                Ok(Measurement::Fresh(voltage))
-            }
-            _ => unreachable!()
+        if config_reg.is_ready() {
+            // The "Not Ready" flag is not set. This means the latest
+            // conversion result is ready.
+            Ok(Measurement::Fresh(voltage))
+        } else {
+            // The "Not Ready" flag is set. This means the conversion
+            // result is not updated since the last reading. A new
+            // conversion is under processing and the RDY bit will be
+            // cleared when the new conversion result is ready.
+            Ok(Measurement::NotFresh(voltage))
         }
     }
 
     /// Read an i16 and the configuration register from the device.
-    fn read_i16_and_config(&mut self) -> Result<(i16, u8), Error<E>> {
+    fn read_i16_and_config(&mut self) -> Result<(i16, ConfigRegister), Error<E>> {
         let mut buf = [0, 0, 0];
         self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        Ok((BigEndian::read_i16(&buf[0..2]), buf[2]))
+        let measurement = BigEndian::read_i16(&buf[0..2]);
+        let config_reg = ConfigRegister::from_bits_truncate(buf[2]);
+        Ok((measurement, config_reg))
     }
 }
