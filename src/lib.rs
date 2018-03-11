@@ -77,7 +77,7 @@
 //! let mut adc = MCP3425::oneshot(dev, address, Delay);
 //! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
 //! match adc.measure(&config) {
-//!     Ok(mv) => println!("ADC measured {} mV", mv),
+//!     Ok(voltage) => println!("ADC measured {} mV", voltage.millivolts()),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
 //!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
 //!     Err(Error::VoltageTooLow) => println!("Voltage is too low to measure"),
@@ -309,6 +309,30 @@ impl Config {
 }
 
 
+/// A voltage measurement.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Voltage {
+    millivolts: i16,
+}
+
+impl Voltage {
+    /// Create a new `Voltage` instance from a millivolt measurement.
+    pub fn from_millivolts(millivolts: i16) -> Self {
+        Self { millivolts }
+    }
+
+    /// Return the voltage in millivolts.
+    pub fn millivolts(&self) -> i16 {
+        self.millivolts
+    }
+
+    /// Return the voltage in volts.
+    pub fn volts(&self) -> f32 {
+        self.millivolts as f32 / 1000.0
+    }
+}
+
+
 /// This enum wraps the measurements read in continuous conversion mode.
 ///
 /// The two enum types indicate whether the measurement is fresh, or whether it
@@ -320,9 +344,9 @@ impl Config {
 #[derive(Debug, Copy, Clone)]
 pub enum Measurement {
     /// The measurement is fresh.
-    Fresh(i16),
+    Fresh(Voltage),
     /// The conversion result has not been updated since the last reading.
-    NotFresh(i16),
+    NotFresh(Voltage),
 }
 
 
@@ -373,7 +397,7 @@ where
     /// Calculate the voltage for the measurement result at the specified sample rate.
     ///
     /// If the value is a saturation value, an error is returned.
-    fn calculate_voltage(&self, measurement: i16, resolution: &Resolution) -> Result<i16, Error<E>> {
+    fn calculate_voltage(&self, measurement: i16, resolution: &Resolution) -> Result<Voltage, Error<E>> {
         // Handle saturation / out of range values
         if measurement == resolution.max() {
             return Err(Error::VoltageTooHigh)
@@ -384,7 +408,7 @@ where
         let converted = measurement as i32
             * (REF_MILLIVOLTS * 2) as i32
             / (1 << resolution.res_bits()) as i32;
-        Ok(converted as i16)
+        Ok(Voltage::from_millivolts(converted as i16))
     }
 }
 
@@ -419,7 +443,7 @@ where
     /// Do a one-shot voltage measurement.
     ///
     /// Return the result in millivolts.
-    pub fn measure(&mut self, config: &Config) -> Result<i16, Error<E>> {
+    pub fn measure(&mut self, config: &Config) -> Result<Voltage, Error<E>> {
         let command = ConfigRegister::NOT_READY.bits()
                     | self.mode.bits()
                     | config.bits();
@@ -552,5 +576,22 @@ where
             // cleared when the new conversion result is ready.
             Ok(Measurement::NotFresh(voltage))
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_voltage_wrapper() {
+        let a = Voltage::from_millivolts(2500);
+        assert_eq!(a.millivolts(), 2500i16);
+        assert_eq!(a.volts(), 2.5f32);
+
+        let b = Voltage::from_millivolts(-100);
+        assert_eq!(b.millivolts(), -100i16);
+        assert_eq!(b.volts(), -0.1f32);
     }
 }
