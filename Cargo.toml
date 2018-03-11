@@ -2,6 +2,21 @@
 name = "mcp3425"
 version = "0.1.0"
 authors = ["Danilo Bargen <mail@dbrgn.ch>"]
+documentation = "https://docs.rs/mcp3425"
+repository = "https://github.com/dbrgn/mcp3425-rs"
+license = "MIT OR Apache-2.0"
+description = "Platform agnostic Rust driver for the Microchip MCP3425 ADC."
+readme = "README.md"
+keywords = ["mcp3425", "microchip", "driver", "adc", "embedded-hal-driver"]
+categories = ["embedded", "hardware-support", "no-std"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
 
 [dependencies]
 byteorder = "1.2"
