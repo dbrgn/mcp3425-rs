@@ -7,6 +7,8 @@
 This is a platform agnostic Rust driver for the MCP3425, based on the
 [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
 
+Docs: https://docs.rs/mcp3425
+
 
 ## The Device
 
