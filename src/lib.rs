@@ -114,9 +114,14 @@ pub enum Error<E> {
     /// A measurement in continuous mode has been triggered without previously
     /// writing the configuration to the device.
     NotInitialized,
-    /// A measurement in one-shot mode returned a stale result.
-    /// This is probably a timing bug that should be reported to
+    /// A measurement returned a stale result.
+    ///
+    /// In continuous mode, this can happen if you poll faster than the sample
+    /// rate. See datasheet section 5.1.1 for more details.
+    ///
+    /// In one-shot mode, this is probably a timing bug that should be reported to
     /// https://github.com/dbrgn/mcp3425-rs/issues/!
+    ///
     NotReady,
 }
 
@@ -333,23 +338,6 @@ impl Voltage {
 }
 
 
-/// This enum wraps the measurements read in continuous conversion mode.
-///
-/// The two enum types indicate whether the measurement is fresh, or whether it
-/// has already been read previously (either because no measurement has been
-/// ready since the last reset, or because not enough time has passed since the
-/// last measurement).
-///
-/// See datasheet section 5.1.1 for more details.
-#[derive(Debug, Copy, Clone)]
-pub enum Measurement {
-    /// The measurement is fresh.
-    Fresh(Voltage),
-    /// The conversion result has not been updated since the last reading.
-    NotFresh(Voltage),
-}
-
-
 /// Driver for the MCP3425 ADC
 #[derive(Debug, Default)]
 pub struct MCP3425<I2C, D, M> {
@@ -554,7 +542,10 @@ where
     /// method MUST have been called before, otherwise
     /// [`Error::NotInitialized`](enum.Error.html#variant.NotInitialized) will
     /// be returned.
-    pub fn read_measurement(&mut self) -> Result<Measurement, Error<E>> {
+    ///
+    /// If you poll faster than the sample rate,
+    /// [`Error::NotReady`](enum.Error.html#variant.NotReady) will be returned.
+    pub fn read_measurement(&mut self) -> Result<Voltage, Error<E>> {
         // Make sure that the configuration has been written to the device
         let config = self.config.ok_or(Error::NotInitialized)?;
 
@@ -568,13 +559,13 @@ where
         if config_reg.is_ready() {
             // The "Not Ready" flag is not set. This means the latest
             // conversion result is ready.
-            Ok(Measurement::Fresh(voltage))
+            Ok(voltage)
         } else {
             // The "Not Ready" flag is set. This means the conversion
             // result is not updated since the last reading. A new
             // conversion is under processing and the RDY bit will be
             // cleared when the new conversion result is ready.
-            Ok(Measurement::NotFresh(voltage))
+            Err(Error::NotReady)
         }
     }
 }
