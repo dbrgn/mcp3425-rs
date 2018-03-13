@@ -64,6 +64,8 @@
 //!
 //! ### Measurements
 //!
+//! **One-Shot**
+//!
 //! You can trigger a one-shot measurement:
 //!
 //! ```no_run
@@ -89,6 +91,32 @@
 //!
 //! As you can see, the saturation values are automatically converted to
 //! proper errors.
+//!
+//! **Continuous**
+//!
+//! You can also configure the ADC in continuous mode:
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate mcp3425;
+//! # use hal::{Delay, I2cdev};
+//! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let address = 0x68;
+//! let mut adc = MCP3425::continuous(dev, address, Delay);
+//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! adc.set_config(&config).unwrap();
+//! match adc.read_measurement() {
+//!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
+//!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
+//!     Err(Error::VoltageTooHigh) => println!("Voltage is too high to measure"),
+//!     Err(Error::VoltageTooLow) => println!("Voltage is too low to measure"),
+//!     Err(Error::NotReady) => println!("Measurement not yet ready. Polling too fast?"),
+//!     Err(Error::NotInitialized) => println!("You forgot to call .set_config"),
+//! }
+//! # }
+//! ```
 //!
 //! ## Feature Flags
 //!
