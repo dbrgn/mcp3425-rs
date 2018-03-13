@@ -9,6 +9,8 @@ This is a platform agnostic Rust driver for the MCP3425, based on the
 
 Docs: https://docs.rs/mcp3425
 
+Introductory blogpost: https://blog.dbrgn.ch/2018/3/13/rust-mcp3425-driver/
+
 
 ## The Device
 
@@ -27,7 +29,6 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 - [x] Configurable gain (PGA)
 - [x] Handle saturation values (high and low)
 - [x] Docs
-- [ ] Polishing
 
 
 ## License
