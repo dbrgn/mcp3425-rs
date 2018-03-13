@@ -18,13 +18,21 @@ jobs:
           name: Show versions
           command: rustc --version && cargo --version
 
-      # Build
+      # Default features
       - run:
-          name: Build
+          name: Build (default)
           command: cargo build
       - run:
-          name: Test
+          name: Test (default)
           command: cargo test
+
+      # Feature: measurements
+      - run:
+          name: Build (measurements)
+          command: cargo build --features measurements
+      - run:
+          name: Test (measurements)
+          command: cargo test --features measurements
 
       # Save cache
       - save_cache:

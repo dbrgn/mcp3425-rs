@@ -31,6 +31,16 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 - [x] Docs
 
 
+## Feature Flags
+
+The following feature flags exists:
+
+- `measurements`: Use the
+  [measurements](https://github.com/thejpster/rust-measurements) crate
+  to represent voltages instead of the custom
+  [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
+
+
 ## License
 
 Licensed under either of
