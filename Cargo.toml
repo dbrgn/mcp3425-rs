@@ -23,7 +23,7 @@ default = []
 
 [dependencies]
 byteorder = "1.2"
-embedded-hal = "0.1.0"
+embedded-hal = "0.2"
 bitflags = "1.0"
 
 [dependencies.measurements]
@@ -31,7 +31,7 @@ version = "0.9"
 optional = true
 
 [dev-dependencies]
-linux-embedded-hal = "0.1.1"
+linux-embedded-hal = "0.2"
 
 [profile.release]
 lto = true
