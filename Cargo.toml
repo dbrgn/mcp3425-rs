@@ -1,6 +1,6 @@
 [package]
 name = "mcp3425"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Danilo Bargen <mail@dbrgn.ch>"]
 documentation = "https://docs.rs/mcp3425"
 repository = "https://github.com/dbrgn/mcp3425-rs"
