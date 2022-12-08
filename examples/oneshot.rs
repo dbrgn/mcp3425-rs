@@ -2,7 +2,7 @@ extern crate linux_embedded_hal as linux_hal;
 extern crate mcp3425;
 
 use linux_hal::{Delay, I2cdev};
-use mcp3425::{MCP3425, Config, Resolution, Gain};
+use mcp3425::{Config, Gain, Resolution, MCP3425};
 
 fn main() {
     println!("Hello, MCP3425!");
@@ -12,11 +12,23 @@ fn main() {
     let mut adc = MCP3425::oneshot(dev, address, Delay);
     let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
 
-    println!("Temperature 12 bit / 1x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
+    println!(
+        "Temperature 12 bit / 1x gain: {:?}",
+        adc.measure(&config).map_err(|e| format!("{:?}", e))
+    );
     let config = config.with_resolution(Resolution::Bits14Sps60);
-    println!("Temperature 14 bit / 1x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
+    println!(
+        "Temperature 14 bit / 1x gain: {:?}",
+        adc.measure(&config).map_err(|e| format!("{:?}", e))
+    );
     let config = config.with_resolution(Resolution::Bits16Sps15);
-    println!("Temperature 16 bit / 1x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
+    println!(
+        "Temperature 16 bit / 1x gain: {:?}",
+        adc.measure(&config).map_err(|e| format!("{:?}", e))
+    );
     let config = config.with_gain(Gain::Gain2);
-    println!("Temperature 16 bit / 2x gain: {:?}", adc.measure(&config).map_err(|e| format!("{:?}", e)));
+    println!(
+        "Temperature 16 bit / 2x gain: {:?}",
+        adc.measure(&config).map_err(|e| format!("{:?}", e))
+    );
 }

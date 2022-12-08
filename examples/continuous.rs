@@ -4,7 +4,7 @@ extern crate mcp3425;
 
 use hal::blocking::delay::DelayMs;
 use linux_hal::{Delay, I2cdev};
-use mcp3425::{MCP3425, Config, Resolution, Gain};
+use mcp3425::{Config, Gain, Resolution, MCP3425};
 
 fn main() {
     println!("Hello, MCP3425!");
