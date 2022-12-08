@@ -56,7 +56,8 @@
 //! # extern crate mcp3425;
 //! # use mcp3425::{Config, Resolution, Gain};
 //! # fn main() {
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! use mcp3425::Channel;
+//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
 //! let high_res = config.with_resolution(Resolution::Bits16Sps15);
 //! let high_gain = high_res.with_gain(Gain::Gain8);
 //! # }
@@ -74,10 +75,11 @@
 //! # use hal::{Delay, I2cdev};
 //! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
-//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # use mcp3425::Channel;
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::oneshot(dev, address, Delay);
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
 //! match adc.measure(&config) {
 //!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
@@ -102,10 +104,11 @@
 //! # use hal::{Delay, I2cdev};
 //! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
-//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # use mcp3425::Channel;
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::continuous(dev, address, Delay);
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
 //! adc.set_config(&config).unwrap();
 //! match adc.read_measurement() {
 //!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
@@ -304,6 +307,37 @@ impl Default for Gain {
     }
 }
 
+/// Selected ADC channel
+///
+/// Defaults to channel 1.
+#[derive(Copy, Clone, Debug)]
+pub enum Channel {
+    /// First channel (Default)
+    Channel1 = 0b0000_0000,
+    /// Second channel (only supported by MCP3426/7/8)
+    #[cfg(any(feature = "dual_channel", feature = "quad_channel"))]
+    Channel2 = 0b0010_0000,
+    /// Third channel (only supported by MCP3428)
+    #[cfg(feature = "quad_channel")]
+    Channel3 = 0b0100_0000,
+    /// Fourth channel (only supported by MCP3428)
+    #[cfg(feature = "quad_channel")]
+    Channel4 = 0b0110_0000,
+}
+
+impl Default for Channel {
+    fn default() -> Self {
+        Self::Channel1
+    }
+}
+
+impl Channel {
+    /// Return the bitmask for this channel configuration.
+    pub fn bits(&self) -> u8 {
+        *self as u8
+    }
+}
+
 /// Device configuration: Resolution and gain
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Config {
@@ -311,6 +345,8 @@ pub struct Config {
     pub resolution: Resolution,
     /// Programmable gain amplifier (PGA).
     pub gain: Gain,
+    /// Selected input channel
+    pub channel: Channel,
 }
 
 impl Config {
@@ -321,8 +357,12 @@ impl Config {
     /// immediate effect on the device. It is only written when a measurement
     /// is triggered, or when writing config explicitly with
     /// [`set_config`](struct.MCP3425.html#method.set_config).
-    pub fn new(resolution: Resolution, gain: Gain) -> Self {
-        Config { resolution, gain }
+    pub fn new(resolution: Resolution, gain: Gain, channel: Channel) -> Self {
+        Config {
+            resolution,
+            gain,
+            channel,
+        }
     }
 
     /// Create a new configuration where the resolution has been replaced
@@ -331,6 +371,7 @@ impl Config {
         Config {
             resolution,
             gain: self.gain,
+            channel: self.channel,
         }
     }
 
@@ -340,12 +381,24 @@ impl Config {
         Config {
             resolution: self.resolution,
             gain,
+            channel: self.channel,
+        }
+    }
+
+    /// Create a new configuration where the channel has been replaced
+    /// with the specified value.
+    #[cfg(any(feature = "dual_channel", feature = "quad_channel"))]
+    pub fn with_channel(&self, channel: Channel) -> Self {
+        Config {
+            resolution: self.resolution,
+            gain: self.gain,
+            channel,
         }
     }
 
     /// Return the bitmask for the combined configuration values.
     fn bits(&self) -> u8 {
-        self.resolution.bits() | self.gain.bits()
+        self.channel.bits() | self.resolution.bits() | self.gain.bits()
     }
 }
 

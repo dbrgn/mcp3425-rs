@@ -4,7 +4,7 @@
 [![Crates.io Version][crates-io-badge]][crates-io]
 [![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
 
-This is a platform agnostic Rust driver for the MCP3425, based on the
+This is a platform agnostic Rust driver for the MCP3425/6/7/8, based on the
 [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
 
 Docs: https://docs.rs/mcp3425
@@ -20,6 +20,10 @@ The device has an I²C interface and an on-board ±2048mV reference.
 
 Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 
+Variants [MCP3426/7/8](https://ww1.microchip.com/downloads/en/DeviceDoc/22226a.pdf) are supported as well, but require
+to enable one of the following features:
+* `dual_channel` for MCP3426/7
+* `quad_channel` for MCP3428
 
 ## Status
 
@@ -27,6 +31,7 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 - [x] Support continuous measurements
 - [x] Configurable sample rate / resolution
 - [x] Configurable gain (PGA)
+- [x] Configurable channel (only MCP3426/7/8)
 - [x] Handle saturation values (high and low)
 - [x] Docs
 
