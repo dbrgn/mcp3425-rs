@@ -1,0 +1,15 @@
+name: Clippy
+on: [pull_request]
+jobs:
+  clippy:
+    name: Run clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: giraffate/clippy-action@v1
+        with:
+          reporter: 'github-pr-review' # github-pr-check doesn't work for external contributors
+          github_token: ${{ secrets.GITHUB_TOKEN }}
