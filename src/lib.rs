@@ -608,6 +608,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "measurements"))]
     use super::*;
 
     #[test]
