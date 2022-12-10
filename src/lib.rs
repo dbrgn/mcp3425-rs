@@ -130,7 +130,8 @@
 #![no_std]
 #![deny(missing_docs)]
 
-#[macro_use] extern crate bitflags;
+#[macro_use]
+extern crate bitflags;
 extern crate byteorder;
 extern crate embedded_hal as hal;
 
@@ -138,11 +139,10 @@ use byteorder::{BigEndian, ByteOrder};
 use hal::blocking::delay::DelayMs;
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
-#[cfg(feature="measurements")]
+#[cfg(feature = "measurements")]
 extern crate measurements;
-#[cfg(feature="measurements")]
+#[cfg(feature = "measurements")]
 use measurements::voltage::Voltage;
-
 
 /// All possible errors in this crate
 #[derive(Debug)]
@@ -167,7 +167,6 @@ pub enum Error<E> {
     NotReady,
 }
 
-
 bitflags! {
     struct ConfigRegister: u8 {
         const NOT_READY = 0b10000000;
@@ -185,10 +184,8 @@ impl ConfigRegister {
     }
 }
 
-
 /// ADC reference voltage: +-2048mV
 const REF_MILLIVOLTS: i16 = 2048;
-
 
 /// The two conversion mode structs implement this trait.
 ///
@@ -215,7 +212,6 @@ impl ConversionMode for ContinuousMode {
         0b00010000
     }
 }
-
 
 /// Conversion bit resolution and sample rate
 ///
@@ -277,7 +273,6 @@ impl Default for Resolution {
     }
 }
 
-
 /// Programmable gain amplifier (PGA)
 ///
 /// Defaults to no amplification (`Gain1`),
@@ -308,7 +303,6 @@ impl Default for Gain {
         Gain::Gain1
     }
 }
-
 
 /// Device configuration: Resolution and gain
 #[derive(Debug, Default, Copy, Clone)]
@@ -355,15 +349,14 @@ impl Config {
     }
 }
 
-
 /// A voltage measurement.
-#[cfg(not(feature="measurements"))]
+#[cfg(not(feature = "measurements"))]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Voltage {
     millivolts: i16,
 }
 
-#[cfg(not(feature="measurements"))]
+#[cfg(not(feature = "measurements"))]
 impl Voltage {
     /// Create a new `Voltage` instance from a millivolt measurement.
     pub fn from_millivolts(millivolts: i16) -> Self {
@@ -380,7 +373,6 @@ impl Voltage {
         self.millivolts as f32 / 1000.0
     }
 }
-
 
 /// Driver for the MCP3425 ADC
 #[derive(Debug, Default)]
@@ -429,17 +421,20 @@ where
     /// Calculate the voltage for the measurement result at the specified sample rate.
     ///
     /// If the value is a saturation value, an error is returned.
-    fn calculate_voltage(&self, measurement: i16, resolution: &Resolution) -> Result<Voltage, Error<E>> {
+    fn calculate_voltage(
+        &self,
+        measurement: i16,
+        resolution: &Resolution,
+    ) -> Result<Voltage, Error<E>> {
         // Handle saturation / out of range values
         if measurement == resolution.max() {
-            return Err(Error::VoltageTooHigh)
+            return Err(Error::VoltageTooHigh);
         } else if measurement == resolution.min() {
-            return Err(Error::VoltageTooLow)
+            return Err(Error::VoltageTooLow);
         }
 
-        let converted = measurement as i32
-            * (REF_MILLIVOLTS * 2) as i32
-            / (1 << resolution.res_bits()) as i32;
+        let converted =
+            measurement as i32 * (REF_MILLIVOLTS * 2) as i32 / (1 << resolution.res_bits()) as i32;
         Ok(Voltage::from_millivolts((converted as i16).into()))
     }
 }
@@ -476,9 +471,7 @@ where
     ///
     /// Return the result in millivolts.
     pub fn measure(&mut self, config: &Config) -> Result<Voltage, Error<E>> {
-        let command = ConfigRegister::NOT_READY.bits()
-                    | self.mode.bits()
-                    | config.bits();
+        let command = ConfigRegister::NOT_READY.bits() | self.mode.bits() | config.bits();
 
         // Send command
         self.i2c
@@ -509,7 +502,6 @@ where
         Ok(voltage)
     }
 }
-
 
 impl<I2C, D, E> MCP3425<I2C, D, ContinuousMode>
 where
@@ -614,13 +606,12 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    #[cfg(not(feature="measurements"))]
+    #[cfg(not(feature = "measurements"))]
     fn test_voltage_wrapper() {
         let a = Voltage::from_millivolts(2500);
         assert_eq!(a.as_millivolts(), 2500i16);
