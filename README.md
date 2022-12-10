@@ -1,6 +1,6 @@
 # Rust MCP3425 Driver
 
-[![CircleCI][circle-ci-badge]][circle-ci]
+[![GitHub Actions][github-actions-badge]][github-actions]
 [![Crates.io Version][crates-io-badge]][crates-io]
 [![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
 
@@ -59,8 +59,8 @@ be dual licensed as above, without any additional terms or conditions.
 
 
 <!-- Badges -->
-[circle-ci]: https://circleci.com/gh/dbrgn/mcp3425-rs/tree/master
-[circle-ci-badge]: https://circleci.com/gh/dbrgn/mcp3425-rs/tree/master.svg?style=shield
+[github-actions]: https://github.com/dbrgn/mcp3425-rs/actions/workflows/ci.yml
+[github-actions-badge]: https://github.com/dbrgn/mcp3425-rs/actions/workflows/ci.yml/badge.svg
 [crates-io]: https://crates.io/crates/mcp3425
 [crates-io-badge]: https://img.shields.io/crates/v/mcp3425.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/mcp3425
