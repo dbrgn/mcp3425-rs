@@ -24,7 +24,9 @@ fn main() {
     let dev = I2cdev::new("/dev/i2c-1").unwrap();
     let address = 0x68;
     let mut adc = MCP3425::continuous(dev, address, Delay);
-    let config = Config::new(Resolution::Bits16Sps15, Gain::Gain1);
+    let config = Config::default()
+        .with_resolution(Resolution::Bits16Sps15)
+        .with_gain(Gain::Gain1);
 
     println!("Writing configuration to device: {:?}", &config);
     adc.set_config(&config).unwrap();

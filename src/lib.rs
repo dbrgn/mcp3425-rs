@@ -1,33 +1,45 @@
-//! A platform agnostic Rust driver for the MCP3425, based on the
-//! [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+//! A platform agnostic Rust driver for the MCP3425 (and newer variants
+//! MCP3426/MCP3427/MCP3428 as well), based on the
+//! [`embedded-hal`](https://github.com/rust-embedded/embedded-hal) traits.
 //!
 //! ## The Device
 //!
 //! The Microchip MCP3425 is a low-current 16-bit analog-to-digital converter.
+//! The device has an I²C interface and an on-board ±2048mV reference. For more
+//! information, see the
+//! [datasheet](https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/22072b.pdf).
 //!
-//! The device has an I²C interface and an on-board ±2048mV reference.
+//! Variants [MCP3426/7/8](https://ww1.microchip.com/downloads/en/DeviceDoc/22226a.pdf)
+//! are very similar, but support multiple input channels. They are supported as
+//! well, but require to enable one of the following Cargo features:
 //!
-//! - [Details and datasheet](http://www.microchip.com/wwwproducts/en/en533561)
+//! - `dual_channel` for MCP3426/7
+//! - `quad_channel` for MCP3428
+//!
+//! ## Cargo Features
+//!
+//! The following feature flags exists:
+//!
+//! - `dual_channel` for dual-channel support (MCP3426/7/8)
+//! - `quad_channel` for dual-channel support (MCP3428)
+//! - `measurements`: Use the
+//!   [measurements](https://github.com/thejpster/rust-measurements) crate
+//!   to represent voltages instead of the custom
+//!   [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
 //!
 //! ## Usage
 //!
 //! ### Instantiating
 //!
-//! Import this crate and an `embedded_hal` implementation:
-//!
-//! ```
-//! extern crate linux_embedded_hal as hal;
-//! extern crate mcp3425;
-//! ```
-//!
+//! Import this crate and an `embedded_hal` implementation (e.g.
+//! [linux-embedded-hal](https://github.com/rust-embedded/linux-embedded-hal)).
 //! Then instantiate the device in either
 //! [`ContinuousMode`](struct.ContinuousMode.html) or
 //! [`OneShotMode`](struct.OneShotMode.html):
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! use hal::{Delay, I2cdev};
+//! # extern crate linux_embedded_hal;
+//! use linux_embedded_hal::{Delay, I2cdev};
 //! use mcp3425::{MCP3425, Config, Resolution, Gain, Error, OneShotMode};
 //!
 //! # fn main() {
@@ -53,14 +65,20 @@
 //! replaced.
 //!
 //! ```no_run
-//! # extern crate mcp3425;
 //! # use mcp3425::{Config, Resolution, Gain};
 //! # fn main() {
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! use mcp3425::Channel;
+//! let config = Config::default()
+//!     .with_resolution(Resolution::Bits12Sps240)
+//!     .with_gain(Gain::Gain1);
 //! let high_res = config.with_resolution(Resolution::Bits16Sps15);
 //! let high_gain = high_res.with_gain(Gain::Gain8);
 //! # }
 //! ```
+//!
+//! Note: If you enable the `dual_channel` or `quad_channel` Cargo features,
+//! you can also use the method `.with_channel(...)` on the `Config` struct (if
+//! your model supports multiple input channels).
 //!
 //! ### Measurements
 //!
@@ -69,15 +87,15 @@
 //! You can trigger a one-shot measurement:
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! # use hal::{Delay, I2cdev};
+//! # extern crate linux_embedded_hal;
+//! # use linux_embedded_hal::{Delay, I2cdev};
 //! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
-//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # use mcp3425::Channel;
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::oneshot(dev, address, Delay);
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! let config = Config::default();
 //! match adc.measure(&config) {
 //!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
@@ -97,15 +115,15 @@
 //! You can also configure the ADC in continuous mode:
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! # use hal::{Delay, I2cdev};
+//! # extern crate linux_embedded_hal;
+//! # use linux_embedded_hal::{Delay, I2cdev};
 //! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
-//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # use mcp3425::Channel;
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::continuous(dev, address, Delay);
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+//! let config = Config::default();
 //! adc.set_config(&config).unwrap();
 //! match adc.read_measurement() {
 //!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
@@ -117,15 +135,6 @@
 //! }
 //! # }
 //! ```
-//!
-//! ## Feature Flags
-//!
-//! The following feature flags exists:
-//!
-//! - `measurements`: Use the
-//!   [measurements](https://github.com/thejpster/rust-measurements) crate
-//!   to represent voltages instead of the custom
-//!   [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
 
 #![no_std]
 #![deny(missing_docs)]
@@ -162,7 +171,7 @@ pub enum Error<E> {
     /// rate. See datasheet section 5.1.1 for more details.
     ///
     /// In one-shot mode, this is probably a timing bug that should be reported to
-    /// https://github.com/dbrgn/mcp3425-rs/issues/!
+    /// <https://github.com/dbrgn/mcp3425-rs/issues/>!
     ///
     NotReady,
 }
@@ -304,33 +313,85 @@ impl Default for Gain {
     }
 }
 
-/// Device configuration: Resolution and gain
+/// Selected ADC channel
+///
+/// Defaults to channel 1.
+#[derive(Copy, Clone, Debug)]
+pub enum Channel {
+    /// First channel (Default)
+    Channel1 = 0b0000_0000,
+    /// Second channel
+    ///
+    /// Note: Only supported by MCP3426/7/8, and if the `dual_channel` or
+    /// `quad_channel` cargo feature is enabled.
+    #[cfg(any(feature = "dual_channel", feature = "quad_channel", doc))]
+    Channel2 = 0b0010_0000,
+    /// Third channel
+    ///
+    /// Note: Only supported by MCP3428, and if the `quad_channel` cargo
+    /// feature is enabled.
+    #[cfg(any(feature = "quad_channel", doc))]
+    Channel3 = 0b0100_0000,
+    /// Fourth channel
+    ///
+    /// Note: Only supported by MCP3428, and if the `quad_channel` cargo
+    /// feature is enabled.
+    #[cfg(any(feature = "quad_channel", doc))]
+    Channel4 = 0b0110_0000,
+}
+
+impl Default for Channel {
+    fn default() -> Self {
+        Self::Channel1
+    }
+}
+
+impl Channel {
+    /// Return the bitmask for this channel configuration.
+    pub fn bits(&self) -> u8 {
+        *self as u8
+    }
+}
+
+/// Device configuration: Resolution, gain and input channel.
+///
+/// To instantiate this struct, use the `Default` implementation:
+///
+/// ```
+/// # use mcp3425::{Config, Resolution, Gain};
+/// let config = Config::default()
+///     .with_resolution(Resolution::Bits14Sps60)
+///     .with_gain(Gain::Gain2);
+/// ```
+///
+/// Default values:
+///
+/// - Resolution: Bits12Sps240
+/// - Gain: Gain1
+/// - Channel: Channel1
+///
+/// Note: Creating and changing this instance does not have an immediate effect
+/// on the device. It is only written when a measurement is triggered, or when
+/// writing config explicitly with
+/// [`set_config`](struct.MCP3425.html#method.set_config).
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Config {
     /// Conversion bit resolution and sample rate.
     pub resolution: Resolution,
     /// Programmable gain amplifier (PGA).
     pub gain: Gain,
+    /// Selected input channel
+    pub channel: Channel,
 }
 
 impl Config {
-    /// Create a new device configuration with the specified resolution /
-    /// sample rate and gain.
-    ///
-    /// Note that creating and changing this instance does not have an
-    /// immediate effect on the device. It is only written when a measurement
-    /// is triggered, or when writing config explicitly with
-    /// [`set_config`](struct.MCP3425.html#method.set_config).
-    pub fn new(resolution: Resolution, gain: Gain) -> Self {
-        Config { resolution, gain }
-    }
-
     /// Create a new configuration where the resolution has been replaced
     /// with the specified value.
     pub fn with_resolution(&self, resolution: Resolution) -> Self {
         Config {
             resolution,
             gain: self.gain,
+            channel: self.channel,
         }
     }
 
@@ -340,12 +401,24 @@ impl Config {
         Config {
             resolution: self.resolution,
             gain,
+            channel: self.channel,
+        }
+    }
+
+    /// Create a new configuration where the channel has been replaced
+    /// with the specified value.
+    #[cfg(any(feature = "dual_channel", feature = "quad_channel", doc))]
+    pub fn with_channel(&self, channel: Channel) -> Self {
+        Config {
+            resolution: self.resolution,
+            gain: self.gain,
+            channel,
         }
     }
 
     /// Return the bitmask for the combined configuration values.
     fn bits(&self) -> u8 {
-        self.resolution.bits() | self.gain.bits()
+        self.channel.bits() | self.resolution.bits() | self.gain.bits()
     }
 }
 

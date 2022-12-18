@@ -20,6 +20,10 @@ include = [
 
 [features]
 default = []
+# Support for MCP3426 and MCP3427
+dual_channel = []
+# Support for MCP3428
+quad_channel = []
 
 [dependencies]
 byteorder = "1.2"

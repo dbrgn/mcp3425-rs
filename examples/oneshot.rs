@@ -10,7 +10,7 @@ fn main() {
     let dev = I2cdev::new("/dev/i2c-1").unwrap();
     let address = 0x68;
     let mut adc = MCP3425::oneshot(dev, address, Delay);
-    let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1);
+    let config = Config::default();
 
     println!(
         "Temperature 12 bit / 1x gain: {:?}",

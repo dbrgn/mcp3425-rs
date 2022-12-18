@@ -1,11 +1,12 @@
-# Rust MCP3425 Driver
+# Rust MCP3425/6/7/8 Driver
 
 [![GitHub Actions][github-actions-badge]][github-actions]
 [![Crates.io Version][crates-io-badge]][crates-io]
 [![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
 
-This is a platform agnostic Rust driver for the MCP3425, based on the
-[`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+This is a platform agnostic Rust driver for the MCP3425 (and newer variants
+MCP3426/MCP3427/MCP3428 as well), based on the
+[`embedded-hal`](https://github.com/rust-embedded/embedded-hal) traits.
 
 Docs: https://docs.rs/mcp3425
 
@@ -18,7 +19,14 @@ The Microchip MCP3425 is a low-current 16-bit analog-to-digital converter.
 
 The device has an I²C interface and an on-board ±2048mV reference.
 
-Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
+Details and datasheet: https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/22072b.pdf
+
+Variants [MCP3426/7/8](https://ww1.microchip.com/downloads/en/DeviceDoc/22226a.pdf)
+are very similar, but support multiple input channels. They are supported as
+well, but require to enable one of the following Cargo features:
+
+- `dual_channel` for MCP3426/7
+- `quad_channel` for MCP3428
 
 
 ## Status
@@ -27,18 +35,9 @@ Details and datasheet: http://www.microchip.com/wwwproducts/en/en533561
 - [x] Support continuous measurements
 - [x] Configurable sample rate / resolution
 - [x] Configurable gain (PGA)
+- [x] Configurable channel (only MCP3426/7/8)
 - [x] Handle saturation values (high and low)
 - [x] Docs
-
-
-## Feature Flags
-
-The following feature flags exists:
-
-- `measurements`: Use the
-  [measurements](https://github.com/thejpster/rust-measurements) crate
-  to represent voltages instead of the custom
-  [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
 
 
 ## License
