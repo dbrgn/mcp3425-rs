@@ -57,11 +57,16 @@
 //! # use mcp3425::{Config, Resolution, Gain};
 //! # fn main() {
 //! use mcp3425::Channel;
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
+//! let config = Config::default()
+//!     .with_resolution(Resolution::Bits12Sps240)
+//!     .with_gain(Gain::Gain1);
 //! let high_res = config.with_resolution(Resolution::Bits16Sps15);
 //! let high_gain = high_res.with_gain(Gain::Gain8);
 //! # }
 //! ```
+//!
+//! Note: If you enable the `dual_channel` or `quad_channel` Cargo features,
+//! you can also use the method `.with_channel(...)` on the `Config` struct.
 //!
 //! ### Measurements
 //!
@@ -79,7 +84,7 @@
 //! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::oneshot(dev, address, Delay);
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
+//! let config = Config::default();
 //! match adc.measure(&config) {
 //!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
 //!     Err(Error::I2c(e)) => println!("An I2C error happened: {}", e),
@@ -108,7 +113,7 @@
 //! let dev = I2cdev::new("/dev/i2c-1").unwrap();
 //! # let address = 0x68;
 //! let mut adc = MCP3425::continuous(dev, address, Delay);
-//! let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
+//! let config = Config::default();
 //! adc.set_config(&config).unwrap();
 //! match adc.read_measurement() {
 //!     Ok(voltage) => println!("ADC measured {} mV", voltage.as_millivolts()),
@@ -338,7 +343,27 @@ impl Channel {
     }
 }
 
-/// Device configuration: Resolution and gain
+/// Device configuration: Resolution, gain and input channel.
+///
+/// To instantiate this struct, use the `Default` implementation:
+///
+/// ```
+/// # use mcp3425::{Config, Resolution, Gain};
+/// let config = Config::default()
+///     .with_resolution(Resolution::Bits14Sps60)
+///     .with_gain(Gain::Gain2);
+/// ```
+///
+/// Default values:
+///
+/// - Resolution: Bits12Sps240
+/// - Gain: Gain1
+/// - Channel: Channel1
+///
+/// Note: Creating and changing this instance does not have an immediate effect
+/// on the device. It is only written when a measurement is triggered, or when
+/// writing config explicitly with
+/// [`set_config`](struct.MCP3425.html#method.set_config).
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Config {
     /// Conversion bit resolution and sample rate.
@@ -350,21 +375,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Create a new device configuration with the specified resolution /
-    /// sample rate and gain.
-    ///
-    /// Note that creating and changing this instance does not have an
-    /// immediate effect on the device. It is only written when a measurement
-    /// is triggered, or when writing config explicitly with
-    /// [`set_config`](struct.MCP3425.html#method.set_config).
-    pub fn new(resolution: Resolution, gain: Gain, channel: Channel) -> Self {
-        Config {
-            resolution,
-            gain,
-            channel,
-        }
-    }
-
     /// Create a new configuration where the resolution has been replaced
     /// with the specified value.
     pub fn with_resolution(&self, resolution: Resolution) -> Self {

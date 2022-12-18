@@ -2,7 +2,7 @@ extern crate linux_embedded_hal as linux_hal;
 extern crate mcp3425;
 
 use linux_hal::{Delay, I2cdev};
-use mcp3425::{Channel, Config, Gain, Resolution, MCP3425};
+use mcp3425::{Config, Gain, Resolution, MCP3425};
 
 fn main() {
     println!("Hello, MCP3425!");
@@ -10,7 +10,7 @@ fn main() {
     let dev = I2cdev::new("/dev/i2c-1").unwrap();
     let address = 0x68;
     let mut adc = MCP3425::oneshot(dev, address, Delay);
-    let config = Config::new(Resolution::Bits12Sps240, Gain::Gain1, Channel::Channel1);
+    let config = Config::default();
 
     println!(
         "Temperature 12 bit / 1x gain: {:?}",
