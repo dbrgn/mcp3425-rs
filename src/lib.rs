@@ -141,12 +141,12 @@
 
 #[macro_use]
 extern crate bitflags;
-extern crate byteorder;
-extern crate embedded_hal as hal;
 
 use byteorder::{BigEndian, ByteOrder};
-use hal::blocking::delay::DelayMs;
-use hal::blocking::i2c::{Read, Write, WriteRead};
+use embedded_hal::blocking::{
+    delay::DelayMs,
+    i2c::{Read, Write, WriteRead},
+};
 
 #[cfg(feature = "measurements")]
 extern crate measurements;
