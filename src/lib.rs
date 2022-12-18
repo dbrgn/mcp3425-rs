@@ -1,33 +1,45 @@
-//! A platform agnostic Rust driver for the MCP3425, based on the
-//! [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+//! A platform agnostic Rust driver for the MCP3425 (and newer variants
+//! MCP3426/MCP3427/MCP3428 as well), based on the
+//! [`embedded-hal`](https://github.com/rust-embedded/embedded-hal) traits.
 //!
 //! ## The Device
 //!
 //! The Microchip MCP3425 is a low-current 16-bit analog-to-digital converter.
+//! The device has an I²C interface and an on-board ±2048mV reference. For more
+//! information, see the
+//! [datasheet](https://ww1.microchip.com/downloads/aemDocuments/documents/OTH/ProductDocuments/DataSheets/22072b.pdf).
 //!
-//! The device has an I²C interface and an on-board ±2048mV reference.
+//! Variants [MCP3426/7/8](https://ww1.microchip.com/downloads/en/DeviceDoc/22226a.pdf)
+//! are very similar, but support multiple input channels. They are supported as
+//! well, but require to enable one of the following Cargo features:
 //!
-//! - [Details and datasheet](http://www.microchip.com/wwwproducts/en/en533561)
+//! - `dual_channel` for MCP3426/7
+//! - `quad_channel` for MCP3428
+//!
+//! ## Cargo Features
+//!
+//! The following feature flags exists:
+//!
+//! - `dual_channel` for dual-channel support (MCP3426/7/8)
+//! - `quad_channel` for dual-channel support (MCP3428)
+//! - `measurements`: Use the
+//!   [measurements](https://github.com/thejpster/rust-measurements) crate
+//!   to represent voltages instead of the custom
+//!   [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
 //!
 //! ## Usage
 //!
 //! ### Instantiating
 //!
-//! Import this crate and an `embedded_hal` implementation:
-//!
-//! ```
-//! extern crate linux_embedded_hal as hal;
-//! extern crate mcp3425;
-//! ```
-//!
+//! Import this crate and an `embedded_hal` implementation (e.g.
+//! [linux-embedded-hal](https://github.com/rust-embedded/linux-embedded-hal)).
 //! Then instantiate the device in either
 //! [`ContinuousMode`](struct.ContinuousMode.html) or
 //! [`OneShotMode`](struct.OneShotMode.html):
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! use hal::{Delay, I2cdev};
+//! # extern crate linux_embedded_hal;
+//! use linux_embedded_hal::{Delay, I2cdev};
 //! use mcp3425::{MCP3425, Config, Resolution, Gain, Error, OneShotMode};
 //!
 //! # fn main() {
@@ -53,7 +65,6 @@
 //! replaced.
 //!
 //! ```no_run
-//! # extern crate mcp3425;
 //! # use mcp3425::{Config, Resolution, Gain};
 //! # fn main() {
 //! use mcp3425::Channel;
@@ -66,7 +77,8 @@
 //! ```
 //!
 //! Note: If you enable the `dual_channel` or `quad_channel` Cargo features,
-//! you can also use the method `.with_channel(...)` on the `Config` struct.
+//! you can also use the method `.with_channel(...)` on the `Config` struct (if
+//! your model supports multiple input channels).
 //!
 //! ### Measurements
 //!
@@ -75,9 +87,8 @@
 //! You can trigger a one-shot measurement:
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! # use hal::{Delay, I2cdev};
+//! # extern crate linux_embedded_hal;
+//! # use linux_embedded_hal::{Delay, I2cdev};
 //! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
 //! # use mcp3425::Channel;
@@ -104,9 +115,8 @@
 //! You can also configure the ADC in continuous mode:
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate mcp3425;
-//! # use hal::{Delay, I2cdev};
+//! # extern crate linux_embedded_hal;
+//! # use linux_embedded_hal::{Delay, I2cdev};
 //! # use mcp3425::{MCP3425, Config, Resolution, Gain, Error};
 //! # fn main() {
 //! # use mcp3425::Channel;
@@ -125,15 +135,6 @@
 //! }
 //! # }
 //! ```
-//!
-//! ## Feature Flags
-//!
-//! The following feature flags exists:
-//!
-//! - `measurements`: Use the
-//!   [measurements](https://github.com/thejpster/rust-measurements) crate
-//!   to represent voltages instead of the custom
-//!   [`Voltage`](https://docs.rs/mcp3425/*/mcp3425/struct.Voltage.html) wrapper
 
 #![no_std]
 #![deny(missing_docs)]
@@ -170,7 +171,7 @@ pub enum Error<E> {
     /// rate. See datasheet section 5.1.1 for more details.
     ///
     /// In one-shot mode, this is probably a timing bug that should be reported to
-    /// https://github.com/dbrgn/mcp3425-rs/issues/!
+    /// <https://github.com/dbrgn/mcp3425-rs/issues/>!
     ///
     NotReady,
 }
@@ -319,14 +320,23 @@ impl Default for Gain {
 pub enum Channel {
     /// First channel (Default)
     Channel1 = 0b0000_0000,
-    /// Second channel (only supported by MCP3426/7/8)
-    #[cfg(any(feature = "dual_channel", feature = "quad_channel"))]
+    /// Second channel
+    ///
+    /// Note: Only supported by MCP3426/7/8, and if the `dual_channel` or
+    /// `quad_channel` cargo feature is enabled.
+    #[cfg(any(feature = "dual_channel", feature = "quad_channel", doc))]
     Channel2 = 0b0010_0000,
-    /// Third channel (only supported by MCP3428)
-    #[cfg(feature = "quad_channel")]
+    /// Third channel
+    ///
+    /// Note: Only supported by MCP3428, and if the `quad_channel` cargo
+    /// feature is enabled.
+    #[cfg(any(feature = "quad_channel", doc))]
     Channel3 = 0b0100_0000,
-    /// Fourth channel (only supported by MCP3428)
-    #[cfg(feature = "quad_channel")]
+    /// Fourth channel
+    ///
+    /// Note: Only supported by MCP3428, and if the `quad_channel` cargo
+    /// feature is enabled.
+    #[cfg(any(feature = "quad_channel", doc))]
     Channel4 = 0b0110_0000,
 }
 
@@ -397,7 +407,7 @@ impl Config {
 
     /// Create a new configuration where the channel has been replaced
     /// with the specified value.
-    #[cfg(any(feature = "dual_channel", feature = "quad_channel"))]
+    #[cfg(any(feature = "dual_channel", feature = "quad_channel", doc))]
     pub fn with_channel(&self, channel: Channel) -> Self {
         Config {
             resolution: self.resolution,
