@@ -1,9 +1,5 @@
-extern crate embedded_hal as hal;
-extern crate linux_embedded_hal as linux_hal;
-extern crate mcp3425;
-
-use hal::blocking::delay::DelayMs;
-use linux_hal::{Delay, I2cdev};
+use embedded_hal::blocking::delay::DelayMs;
+use linux_embedded_hal::{Delay, I2cdev};
 use mcp3425::{Config, Gain, Resolution, MCP3425};
 
 fn main() {
