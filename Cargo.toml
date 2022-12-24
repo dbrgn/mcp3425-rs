@@ -36,7 +36,7 @@ version = "0.10"
 optional = true
 
 [dev-dependencies]
-linux-embedded-hal = "0.2"
+linux-embedded-hal = "0.3"
 
 [profile.release]
 lto = true
