@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 
+## [1.0.0] - 2022-12-24
+
+This release adds support for the MCP3426/7/8 models, at the cost of a slightly
+adjusted API. Thanks @marius-meissner for contributing and testing this
+feature!
+
+### Added
+
+- Support for multi-channel measurements (#10)
+- Support for MCP3426/7/8 models (#10)
+
+### Changed
+
+- The `Config::new(...)` constructor function is now gone. Use
+  `Config::default()` with the builder methods to create your measurement
+  config instead.
+- Switch to Rust 2021 edition (#14)
+- Upgrade linux-embedded-hal dependency: 0.2 → 0.3
+- Upgrade measurements dependency: 0.10 → 0.11
+
+
 ## [0.3.0] - 2018-05-15
 
 ### Changed
@@ -52,6 +73,7 @@ may be some API changes in the future, in case I decide that something can be
 further improved. All changes will be documented in this CHANGELOG.
 
 
+[1.0.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/dbrgn/mcp3425-rs/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.1.1...v0.2.0
