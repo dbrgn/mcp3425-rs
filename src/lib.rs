@@ -136,7 +136,7 @@
 //! # }
 //! ```
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
 
 #[macro_use]
@@ -507,11 +507,16 @@ where
         }
 
         let converted =
-            measurement as i32 * (REF_MILLIVOLTS * 2) as i32 / (1 << resolution.res_bits()) as i32;
+            measurement as i32 * (REF_MILLIVOLTS * 2) as i32 / (1 << resolution.res_bits());
         // The "allow" annotation is needed because there are different Voltage
         // types, depending on the build flags.
         #[allow(clippy::useless_conversion)]
         Ok(Voltage::from_millivolts((converted as i16).into()))
+    }
+
+    /// Destroy the driver instance and return the I2C device.
+    pub fn destroy(self) -> I2C {
+        self.i2c
     }
 }
 
@@ -684,7 +689,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(not(feature = "measurements"))]
+    use embedded_hal_mock::eh0::{
+        delay::NoopDelay,
+        i2c::{Mock as I2cMock, Transaction},
+    };
+    use rstest::rstest;
+
     use super::*;
 
     #[test]
@@ -697,5 +707,148 @@ mod tests {
         let b = Voltage::from_millivolts(-100);
         assert_eq!(b.as_millivolts(), -100i16);
         assert_eq!(b.as_volts(), -0.1f32);
+    }
+
+    /// Instantiation in one-shot mode should not do any calls to the I2C bus.
+    #[test]
+    fn test_instantiation_oneshot() {
+        let expectations = [];
+        let dev = I2cMock::new(&expectations);
+        let adc = MCP3425::oneshot(dev, 0x42, NoopDelay);
+        adc.destroy().done();
+    }
+
+    /// Instantiation in continuous mode should not do any calls to the I2C bus.
+    #[test]
+    fn test_instantiation_continuous() {
+        let expectations = [];
+        let dev = I2cMock::new(&expectations);
+        let adc = MCP3425::continuous(dev, 0x42, NoopDelay);
+        adc.destroy().done();
+    }
+
+    /// Successfully measuring a voltage with default configuration.
+    #[rstest]
+    #[case(0b00000111, 0b11111110, 2046)] // Maximum (at 12 bits) - 1
+    #[case(0b00000000, 0b00000111, 7)]
+    #[case(0b00000000, 0b00000000, 0)]
+    #[case(0b11111111, 0b11111111, -1)]
+    #[case(0b11111000, 0b00000001, -2047)] // Minimum (at 12 bits) + 1
+    #[cfg(not(feature = "measurements"))]
+    fn test_read_voltage_oneshot(
+        #[case] byte0: u8,
+        #[case] byte1: u8,
+        #[case] expected_millivolts: i16,
+    ) {
+        let addr = 0x42;
+        let expectations = [
+            // Write default config to config register:
+            // - Bit 7: Initiate new conversion
+            // - Bits 6-5: Channel selection (first channel)
+            // - Bit 4: One-shot conversion mode
+            // - Bits 3-2: Set sample rate 240 SPS
+            // - Bits 1-0: Set PGA gain to 1
+            Transaction::write(addr, vec![0b10000000]),
+            // Device returns data
+            Transaction::read(addr, vec![byte0, byte1, 0b00000000]),
+        ];
+        let dev = I2cMock::new(&expectations);
+        let mut adc = MCP3425::oneshot(dev, addr, NoopDelay);
+        let voltage = adc.measure(&Config::default()).expect("Measuring failed");
+        assert_eq!(voltage.as_millivolts(), expected_millivolts);
+        adc.destroy().done();
+    }
+
+    /// Test saturation at various resolutions.
+    #[rstest]
+    #[case(Resolution::Bits12Sps240, 0b10000000, 0b11111000, 0b00000111)] // 12 bits
+    #[case(Resolution::Bits14Sps60, 0b10000100, 0b11100000, 0b00011111)] // 14 bits
+    #[case(Resolution::Bits16Sps15, 0b10001000, 0b10000000, 0b01111111)] // 16 bits
+    fn test_saturation(
+        #[case] resolution: Resolution,
+        #[case] config: u8,
+        #[case] upper_byte_negative: u8,
+        #[case] upper_byte_positive: u8,
+    ) {
+        let addr = 0x42;
+        let expectations = [
+            // Write config
+            Transaction::write(addr, vec![config]),
+            // Device returns data: Negative saturation
+            Transaction::read(addr, vec![upper_byte_negative, 0b00000000, 0b00000000]),
+            // Write config
+            Transaction::write(addr, vec![config]),
+            // Device returns data: Positive saturation
+            Transaction::read(addr, vec![upper_byte_positive, 0b11111111, 0b00000000]),
+        ];
+        let dev = I2cMock::new(&expectations);
+        let mut adc = MCP3425::oneshot(dev, addr, NoopDelay);
+
+        // Test negative saturation
+        let err_negative = adc
+            .measure(&Config::default().with_resolution(resolution))
+            .unwrap_err();
+        assert!(
+            matches!(err_negative, Error::VoltageTooLow),
+            "{:?}",
+            err_negative
+        );
+
+        // Test positive saturation
+        let err_positive = adc
+            .measure(&Config::default().with_resolution(resolution))
+            .unwrap_err();
+        assert!(
+            matches!(err_positive, Error::VoltageTooHigh),
+            "{:?}",
+            err_positive
+        );
+
+        adc.destroy().done();
+    }
+
+    /// Test the "not ready" response handling.
+    #[rstest]
+    fn test_not_ready() {
+        let addr = 0x42;
+        let default_config = 0b10000000;
+        let expectations = [
+            // Write config
+            Transaction::write(addr, vec![default_config]),
+            // First bit in returned config register is set to 1 (not ready)
+            Transaction::read(addr, vec![0b00000000, 0b00000000, 0b10000000]),
+        ];
+        let dev = I2cMock::new(&expectations);
+        let mut adc = MCP3425::oneshot(dev, addr, NoopDelay);
+
+        let err = adc.measure(&Config::default()).unwrap_err();
+        assert!(matches!(err, Error::NotReady), "{:?}", err);
+
+        adc.destroy().done();
+    }
+
+    /// Test that the configs are written correctly.
+    #[rstest]
+    #[case(Resolution::Bits14Sps60, Gain::Gain8, 0b10000111)]
+    #[cfg(not(feature = "measurements"))]
+    fn test_config(#[case] resolution: Resolution, #[case] gain: Gain, #[case] expected: u8) {
+        let addr = 0x42;
+        let expectations = [
+            // Write config
+            Transaction::write(addr, vec![expected]),
+            Transaction::read(addr, vec![0b00000000, 0b00000000, 0b00000000]),
+        ];
+        let dev = I2cMock::new(&expectations);
+        let mut adc = MCP3425::oneshot(dev, addr, NoopDelay);
+        let voltage = adc
+            .measure(
+                &Config::default()
+                    .with_resolution(resolution)
+                    .with_gain(gain),
+            )
+            .expect("Measuring failed");
+        assert_eq!(voltage.as_volts(), 0.0);
+        assert_eq!(voltage.as_millivolts(), 0);
+        adc.destroy().done();
     }
 }

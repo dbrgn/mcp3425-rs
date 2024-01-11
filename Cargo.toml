@@ -33,7 +33,9 @@ bitflags = "1.0"
 measurements = { version = "0.11", default-features = false, optional = true }
 
 [dev-dependencies]
+embedded-hal-mock = { version = "0.10", features = ["eh0"], default-features = false }
 linux-embedded-hal = "0.3"
+rstest = "0.18"
 
 [profile.release]
 lto = true

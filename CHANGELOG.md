@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 
+## Unreleased
+
+### Added
+
+- The new `.destroy()` method allows reclaiming the I2C device
+
+### Changed
+
+- Internals: Wrote many mocked unit tests using embedded-hal-mock
+
+
 ## [1.0.0] - 2022-12-24
 
 This release adds support for the MCP3426/7/8 models, at the cost of a slightly
