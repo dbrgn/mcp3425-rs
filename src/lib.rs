@@ -507,7 +507,7 @@ where
         }
 
         let converted =
-            measurement as i32 * (REF_MILLIVOLTS * 2) as i32 / (1 << resolution.res_bits()) as i32;
+            measurement as i32 * (REF_MILLIVOLTS * 2) as i32 / (1 << resolution.res_bits());
         // The "allow" annotation is needed because there are different Voltage
         // types, depending on the build flags.
         #[allow(clippy::useless_conversion)]
