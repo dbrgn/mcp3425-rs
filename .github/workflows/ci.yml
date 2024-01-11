@@ -42,6 +42,14 @@ jobs:
       # Test
       - name: Test
         run: cargo test
+      - name: Test (default features)
+        run: cargo test
+      - name: Test (no features)
+        run: cargo test --no-default-features
+      - name: Test (feature measurements)
+        run: cargo test --features measurements
+      - name: Test (feature quad channel)
+        run: cargo test --features quad_channel
       - name: Test (all features)
         run: cargo test --all-features
 

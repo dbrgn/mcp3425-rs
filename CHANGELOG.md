@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - The new `.destroy()` method allows reclaiming the I2C device
 
+### Changed
+
+- Internals: Wrote many mocked unit tests using embedded-hal-mock
+
 
 ## [1.0.0] - 2022-12-24
 
