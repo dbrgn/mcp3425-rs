@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## Unreleased
 
+...
+
+## [1.1.0] - 2024-01-11
+
+Note: This is probably the last release supporting embedded-hal 0.2.
+
 ### Added
 
 - The new `.destroy()` method allows reclaiming the I2C device
@@ -84,6 +90,7 @@ may be some API changes in the future, in case I decide that something can be
 further improved. All changes will be documented in this CHANGELOG.
 
 
+[1.1.0]: https://github.com/dbrgn/mcp3425-rs/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/dbrgn/mcp3425-rs/compare/v0.2.0...v0.2.1
