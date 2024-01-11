@@ -513,6 +513,11 @@ where
         #[allow(clippy::useless_conversion)]
         Ok(Voltage::from_millivolts((converted as i16).into()))
     }
+
+    /// Destroy the driver instance and return the I2C device.
+    pub fn destroy(self) -> I2C {
+        self.i2c
+    }
 }
 
 impl<I2C, D, E> MCP3425<I2C, D, OneShotMode>
