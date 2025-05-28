@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ...
 
+
+## [2.0.0] - 2025-05-28
+
+### Changed
+
+- Upgrade to embedded-hal 1.0
+- Upgrade linux-embedded-hal dependency: 0.3 → 0.4
+- Upgrade bitflags dependency: 1.0 → 2.9
+- Upgrade byteorder dependency: 1.2 → 1.5
+- Add Cargo.lock to the repository
+
+
 ## [1.1.0] - 2024-01-11
 
 Note: This is probably the last release supporting embedded-hal 0.2.
@@ -90,6 +102,7 @@ may be some API changes in the future, in case I decide that something can be
 further improved. All changes will be documented in this CHANGELOG.
 
 
+[2.0.0]: https://github.com/dbrgn/mcp3425-rs/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/dbrgn/mcp3425-rs/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/dbrgn/mcp3425-rs/compare/v0.2.1...v0.3.0

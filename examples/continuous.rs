@@ -1,4 +1,4 @@
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayNs as _;
 use linux_embedded_hal::{Delay, I2cdev};
 use mcp3425::{Config, Gain, Resolution, MCP3425};
 
@@ -28,7 +28,7 @@ fn main() {
     adc.set_config(&config).unwrap();
     println!("Reading measurement: {:?}", &adc.read_measurement());
     println!("Sleeping 150ms");
-    Delay.delay_ms(150u8);
+    Delay.delay_ms(150);
     println!("Reading measurement: {:?}", &adc.read_measurement());
     println!("Reading measurement: {:?}", &adc.read_measurement());
 }
